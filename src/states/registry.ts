@@ -95,4 +95,10 @@ export function getEnabledStates(): StateDefinition[] {
   return STATE_REGISTRY.filter((s) => s.enabled);
 }
 
+// Alaska remains available as an individual live state, but is intentionally
+// excluded from the nationwide Show All experience for now.
+export function getShowAllStates(): StateDefinition[] {
+  return getEnabledStates().filter((s) => s.id !== "alaska");
+}
+
 export const DEFAULT_STATE_ID = "washington";
