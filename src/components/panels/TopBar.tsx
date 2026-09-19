@@ -28,7 +28,7 @@ export default function TopBar() {
 
   const filteredStates = useMemo(() => {
     const query = stateQuery.trim().toLowerCase();
-    if (!query) return STATE_REGISTRY;
+    if (!query) return [];
 
     return STATE_REGISTRY.filter((state) => {
       const stateName = state.name.toLowerCase();
@@ -107,11 +107,14 @@ export default function TopBar() {
                   e.currentTarget.blur();
                 }
               }}
-              placeholder={activeState?.name ?? "Search states"}
+              placeholder="Search states..."
               aria-label="Search by state"
               aria-expanded={stateSearchOpen}
               className="min-w-0 flex-1 bg-transparent text-[11px] text-ink-100 placeholder:text-ink-300 focus:outline-none"
             />
+            <span className="truncate text-[10px] text-ink-500 max-w-[74px]" title={activeState?.name}>
+              {activeState?.name}
+            </span>
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                 showAllStates || activeState?.enabled ? "bg-emerald-400" : "bg-amber-400"
@@ -120,7 +123,7 @@ export default function TopBar() {
             />
           </div>
 
-          {stateSearchOpen && (
+          {stateSearchOpen && stateQuery.trim() && (
             <div className="absolute left-3 top-[38px] w-[210px] max-h-72 overflow-y-auto rounded-md border border-base-700 bg-base-900 shadow-2xl">
               {filteredStates.length > 0 ? (
                 filteredStates.map((state) => (
