@@ -73,7 +73,7 @@ export default function TopBar() {
         )}
         <button
           onClick={() => setProposeMode(!proposeMode)}
-          disabled={showAllStates || !activeState?.enabled}
+          disabled={!showAllStates && !activeState?.enabled}
           className={`text-[12.5px] font-semibold px-4 py-1.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
             proposeMode
               ? "bg-accent-proposed text-white shadow-[0_0_0_3px_rgba(255,84,112,0.25)]"
