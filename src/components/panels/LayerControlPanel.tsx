@@ -4,7 +4,7 @@ import { useState } from "react";
 import DraggablePanel from "@/components/ui/DraggablePanel";
 import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 import { useAppStore } from "@/store/useAppStore";
-import { getState, DEFAULT_STATE_ID } from "@/states/registry";
+import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
 import type { LayerCategory } from "@/lib/types";
 
 const CATEGORY_META: Record<LayerCategory, { label: string; color: string }> = {
@@ -54,7 +54,16 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
   const layerVisibility = useAppStore((s) => s.layerVisibility);
   const toggleLayer = useAppStore((s) => s.toggleLayer);
   const activeStateId = useAppStore((s) => s.activeStateId);
-  const activeLayers = getState(activeStateId)?.layers ?? getState(DEFAULT_STATE_ID)!.layers;
+  const showAllStates = useAppStore((s) => s.showAllStates);
+  const activeLayers = showAllStates
+    ? Array.from(
+        new Map(
+          getEnabledStates()
+            .flatMap((state) => state.layers)
+            .map((layer) => [layer.id, layer] as const)
+        ).values()
+      )
+    : getState(activeStateId)?.layers ?? getState(DEFAULT_STATE_ID)!.layers;
   const [openCategories, setOpenCategories] = useState<Set<LayerCategory>>(new Set(["power", "water", "environment"]));
 
   function toggleCategory(cat: LayerCategory) {
