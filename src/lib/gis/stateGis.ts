@@ -39,6 +39,14 @@ import { MO_LAYER_FETCHERS } from "@/states/missouri/layerFetchers";
 import { MO_SOURCES } from "@/states/missouri/sources";
 import { IL_LAYER_FETCHERS } from "@/states/illinois/layerFetchers";
 import { IL_SOURCES } from "@/states/illinois/sources";
+import { ME_LAYER_FETCHERS } from "@/states/maine/layerFetchers";
+import { ME_SOURCES } from "@/states/maine/sources";
+import { NH_LAYER_FETCHERS } from "@/states/newhampshire/layerFetchers";
+import { NH_SOURCES } from "@/states/newhampshire/sources";
+import { VT_LAYER_FETCHERS } from "@/states/vermont/layerFetchers";
+import { VT_SOURCES } from "@/states/vermont/sources";
+import { MA_LAYER_FETCHERS } from "@/states/massachusetts/layerFetchers";
+import { MA_SOURCES } from "@/states/massachusetts/sources";
 
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
@@ -480,6 +488,82 @@ const ILLINOIS_BUNDLE = buildStandardBundle({
   },
 });
 
+const MAINE_BUNDLE = buildStandardBundle({
+  fetchers: ME_LAYER_FETCHERS,
+  hifldTransmission: ME_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: ME_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: ME_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ISO-NE",
+  environmentalReviewNote:
+    "Maine has no statewide zoning layer — municipal site-plan/land-use review is the primary local gating process, alongside large-load coordination with ISO New England and the serving utility. Maine's 2026 legislative session actively debated data-center energy, water, and tax-policy issues, so regulatory status should be reverified close to any siting decision.",
+  permittingNote: {
+    text: "Large facilities in Maine typically require municipal site-plan/zoning review and large-load service coordination with the serving utility (Central Maine Power, Versant Power, Eastern Maine Electric Cooperative, or another cooperative) and ISO New England. Maine enacted 2026 legislation excluding qualifying data centers from the Business Equipment Tax Exemption (BETE) and the Dirigo Business Incentives Program for certain future projects — general economic-development programs would need project-by-project review. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "me-permitting-general",
+      name: "Maine data-center siting — general regulatory context",
+      url: "https://www.maine.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NEW_HAMPSHIRE_BUNDLE = buildStandardBundle({
+  fetchers: NH_LAYER_FETCHERS,
+  hifldTransmission: NH_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NH_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NH_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ISO-NE",
+  environmentalReviewNote:
+    "New Hampshire has no statewide zoning layer — municipal site-plan/zoning review is the primary local gating process, alongside large-load coordination with ISO New England and the serving utility. Southern New Hampshire's proximity to Greater Boston is a notable siting advantage.",
+  permittingNote: {
+    text: "Large facilities in New Hampshire typically require municipal site-plan/zoning review and large-load service coordination with the serving utility (Eversource Energy New Hampshire, Unitil, New Hampshire Electric Cooperative, or Liberty Utilities) and ISO New England. No major statewide dedicated data-center tax exemption was identified from baseline research; general Business Finance Authority and economic-development programs would need project-by-project review. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "nh-permitting-general",
+      name: "New Hampshire data-center siting — general regulatory context",
+      url: "https://www.puc.nh.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const VERMONT_BUNDLE = buildStandardBundle({
+  fetchers: VT_LAYER_FETCHERS,
+  hifldTransmission: VT_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: VT_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: VT_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ISO-NE",
+  environmentalReviewNote:
+    "Vermont has no statewide zoning system, though many municipalities and regional planning commissions publish local zoning GIS layers — municipal review is the primary local gating process, alongside large-load coordination with ISO New England and the serving utility. Vermont's smaller electric market and generation portfolio favor edge, sustainability-focused, and moderate-scale facilities over hyperscale campuses.",
+  permittingNote: {
+    text: "Large facilities in Vermont typically require municipal site-plan/zoning review and large-load service coordination with the serving utility (Green Mountain Power, Vermont Electric Cooperative, Burlington Electric Department, Washington Electric Cooperative, or another municipal utility) and ISO New England. Vermont does not currently maintain a dedicated data-center-specific tax incentive program; general programs such as the Vermont Employment Growth Incentive (VEGI) would need project-by-project review. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "vt-permitting-general",
+      name: "Vermont data-center siting — general regulatory context",
+      url: "https://publicservice.vermont.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const MASSACHUSETTS_BUNDLE = buildStandardBundle({
+  fetchers: MA_LAYER_FETCHERS,
+  hifldTransmission: MA_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MA_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MA_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ISO-NE",
+  environmentalReviewNote:
+    "Massachusetts has no statewide zoning layer — municipal site-plan/zoning review is the primary local gating process, alongside large-load coordination with ISO New England and the serving utility. Massachusetts electricity prices are often among the highest in the continental United States, which should be weighted heavily in siting and cost analysis.",
+  permittingNote: {
+    text: "Large facilities in Massachusetts typically require municipal site-plan/zoning review and large-load service coordination with the serving utility (Eversource Energy, National Grid, Unitil, or a Municipal Light Plant) and ISO New England. Massachusetts created a Qualified Data Center Sales and Use Tax Exemption offering up to a 20-year exemption for approved projects, but the Executive Office of Economic Development paused acceptance of new applications on 2026-06-25 pending further regulatory review — treat as a potential incentive only until applications reopen. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ma-permitting-general",
+      name: "Massachusetts data-center siting — general regulatory context",
+      url: "https://www.mass.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -500,6 +584,10 @@ const BUNDLES: Record<string, StateGisBundle> = {
   delaware: DELAWARE_BUNDLE,
   missouri: MISSOURI_BUNDLE,
   illinois: ILLINOIS_BUNDLE,
+  maine: MAINE_BUNDLE,
+  newhampshire: NEW_HAMPSHIRE_BUNDLE,
+  vermont: VERMONT_BUNDLE,
+  massachusetts: MASSACHUSETTS_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {

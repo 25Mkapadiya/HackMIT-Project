@@ -18,6 +18,10 @@ import { TEXAS } from "./texas";
 import { DELAWARE } from "./delaware";
 import { ILLINOIS } from "./illinois";
 import { MISSOURI } from "./missouri";
+import { MAINE } from "./maine";
+import { NEW_HAMPSHIRE } from "./newhampshire";
+import { VERMONT } from "./vermont";
+import { MASSACHUSETTS } from "./massachusetts";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -54,6 +58,10 @@ const LIVE_STATES: StateDefinition[] = [
   DELAWARE,
   MISSOURI,
   ILLINOIS,
+  MAINE,
+  NEW_HAMPSHIRE,
+  VERMONT,
+  MASSACHUSETTS,
 ];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(
