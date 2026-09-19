@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { CoolingMedium, CoolingTechnology, LoopType, ScenarioAnalysis, ScenarioConfig } from "@/lib/types";
 import { WASHINGTON } from "@/states/washington";
-import { getState, DEFAULT_STATE_ID } from "@/states/registry";
+import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
 
 function defaultLayerVisibility(stateId: string): Record<string, boolean> {
   const layers = getState(stateId)?.layers ?? WASHINGTON.layers;
@@ -18,6 +18,8 @@ interface AppState {
   // active state (for the state picker / multi-state architecture preview)
   activeStateId: string;
   setActiveStateId: (id: string) => void;
+  showAllStates: boolean;
+  setShowAllStates: (v: boolean) => void;
 
   // layers
   layerVisibility: Record<string, boolean>;
@@ -63,7 +65,26 @@ export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "s
 
 export const useAppStore = create<AppState>((set, get) => ({
   activeStateId: DEFAULT_STATE_ID,
-  setActiveStateId: (id) => set({ activeStateId: id, layerVisibility: defaultLayerVisibility(id) }),
+  setActiveStateId: (id) =>
+    set({
+      activeStateId: id,
+      showAllStates: false,
+      layerVisibility: defaultLayerVisibility(id),
+    }),
+  showAllStates: false,
+  setShowAllStates: (v) =>
+    set((s) => {
+      if (!v) return { showAllStates: false };
+      const mergedVisibility = { ...s.layerVisibility };
+      for (const state of getEnabledStates()) {
+        for (const layer of state.layers) {
+          if (mergedVisibility[layer.id] === undefined) {
+            mergedVisibility[layer.id] = Boolean(layer.defaultVisible);
+          }
+        }
+      }
+      return { showAllStates: true, proposeMode: false, layerVisibility: mergedVisibility };
+    }),
 
   layerVisibility: defaultLayerVisibility(DEFAULT_STATE_ID),
   toggleLayer: (id) =>

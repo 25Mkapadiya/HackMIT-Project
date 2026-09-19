@@ -16,6 +16,8 @@ import { WEST_VIRGINIA } from "./westvirginia";
 import { MARYLAND } from "./maryland";
 import { TEXAS } from "./texas";
 import { DELAWARE } from "./delaware";
+import { ILLINOIS } from "./illinois";
+import { MISSOURI } from "./missouri";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -50,6 +52,8 @@ const LIVE_STATES: StateDefinition[] = [
   MARYLAND,
   TEXAS,
   DELAWARE,
+  MISSOURI,
+  ILLINOIS,
 ];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(

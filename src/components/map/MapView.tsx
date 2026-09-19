@@ -5,7 +5,7 @@ import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { WASHINGTON } from "@/states/washington";
-import { getState, DEFAULT_STATE_ID } from "@/states/registry";
+import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
 import type { LayerDefinition } from "@/lib/types";
@@ -16,6 +16,21 @@ import { buildPopupHtml } from "./popupContent";
 function stateBboxParam(stateId: string): string {
   const state = getState(stateId) ?? getState(DEFAULT_STATE_ID)!;
   return [state.bounds[0][0], state.bounds[0][1], state.bounds[1][0], state.bounds[1][1]].join(",");
+}
+
+function implementedStatesBounds(): [[number, number], [number, number]] {
+  const states = getEnabledStates();
+  if (states.length === 0) return getState(DEFAULT_STATE_ID)!.bounds;
+  return [
+    [
+      Math.min(...states.map((state) => state.bounds[0][0])),
+      Math.min(...states.map((state) => state.bounds[0][1])),
+    ],
+    [
+      Math.max(...states.map((state) => state.bounds[1][0])),
+      Math.max(...states.map((state) => state.bounds[1][1])),
+    ],
+  ];
 }
 
 export default function MapView() {
@@ -39,12 +54,14 @@ export default function MapView() {
   const scenarios = useAppStore((s) => s.scenarios);
   const activeScenarioId = useAppStore((s) => s.activeScenarioId);
   const activeStateId = useAppStore((s) => s.activeStateId);
+  const showAllStates = useAppStore((s) => s.showAllStates);
   const addScenario = useAppStore((s) => s.addScenario);
   const setActiveScenario = useAppStore((s) => s.setActiveScenario);
   // Declared after activeStateId (used before its own declaration otherwise —
   // useRef's initializer runs during render, so this must come after the hook
   // that produces the value it seeds).
   const activeStateIdRef = useRef(activeStateId);
+  const showAllStatesRef = useRef(showAllStates);
 
   // ---- init map (once) ----
   useEffect(() => {
@@ -81,7 +98,8 @@ export default function MapView() {
 
       if (focusedScenarioIdRef.current === target.id) {
         const state = getState(activeStateIdRef.current) ?? getState(DEFAULT_STATE_ID)!;
-        spiralZoomOutToState(map, state.bounds, () => {
+        const returnBounds = showAllStatesRef.current ? implementedStatesBounds() : state.bounds;
+        spiralZoomOutToState(map, returnBounds, () => {
           focusedScenarioIdRef.current = null;
           focusAnimatingRef.current = false;
           syncCompassLabel(map, target, false);
@@ -169,6 +187,7 @@ export default function MapView() {
   // ---- keep the compass target + accessible label in sync with the active site ----
   useEffect(() => {
     activeStateIdRef.current = activeStateId;
+    showAllStatesRef.current = showAllStates;
     const active = scenarios.find((scenario) => scenario.id === activeScenarioId) ?? null;
     activeScenarioRef.current = active
       ? { id: active.id, label: active.label, lng: active.lng, lat: active.lat }
@@ -190,7 +209,7 @@ export default function MapView() {
       compassButton.setAttribute("aria-label", "Reset bearing to north");
       delete compassButton.dataset.focusSite;
     }
-  }, [scenarios, activeScenarioId, activeStateId, mapReady]);
+  }, [scenarios, activeScenarioId, activeStateId, showAllStates, mapReady]);
 
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
@@ -209,93 +228,97 @@ export default function MapView() {
     };
   }, [mapReady, proposeMode, addScenario]);
 
-  // ---- fly to the picked state's real bounds (state picker in TopBar) ----
-  // Tracks which state the map is currently showing (seeded with the state active
-  // at first render, before any user interaction is possible) and flies whenever
-  // activeStateId no longer matches it — including back to the original default.
-  // Comparing against a live "last applied" value, updated on every real
-  // transition, avoids a race where switching states before the map's initial
-  // `load` event fires would otherwise be silently swallowed by an ordinal
-  // "skip the first run" guard, while still correctly re-flying if the user
-  // later returns to that same initial state.
-  const lastAppliedStateIdRef = useRef(activeStateId);
+  // ---- state / all-implemented-states camera ----
+  const lastCameraTargetRef = useRef(`state:${activeStateId}`);
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    if (activeStateId !== lastAppliedStateIdRef.current) {
+    const cameraTarget = showAllStates ? "all-implemented" : `state:${activeStateId}`;
+    if (cameraTarget === lastCameraTargetRef.current) return;
+
+    if (showAllStates) {
+      mapRef.current.fitBounds(implementedStatesBounds(), { padding: 72, duration: 1200 });
+    } else {
       const state = getState(activeStateId);
-      if (state) {
-        mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
-      }
+      if (state) mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
     }
-    lastAppliedStateIdRef.current = activeStateId;
-  }, [mapReady, activeStateId]);
+    lastCameraTargetRef.current = cameraTarget;
+  }, [mapReady, activeStateId, showAllStates]);
 
   // ---- load/toggle infrastructure layers ----
-  const lastSyncedStateId = useRef<string | null>(null);
+  // Every source + rendered MapLibre layer is state-prefixed, so "Show All" can
+  // display the same logical layer (e.g. transmission-lines) for many states
+  // simultaneously without id collisions.
+  const lastSyncedViewKey = useRef("");
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    const state = getState(activeStateId) ?? getState(DEFAULT_STATE_ID)!;
-    const bboxParam = stateBboxParam(activeStateId);
+    const states = showAllStates
+      ? getEnabledStates()
+      : [getState(activeStateId) ?? getState(DEFAULT_STATE_ID)!];
+    const wantedStateIds = new Set(states.map((state) => state.id));
+    const viewKey = showAllStates
+      ? `all:${states.map((state) => state.id).sort().join(",")}`
+      : `state:${activeStateId}`;
+    lastSyncedViewKey.current = viewKey;
 
-    // Switching states: a layer id like "transmission-lines" means a different
-    // upstream dataset per state (see src/lib/gis/stateGis.ts), so the previously
-    // loaded sources/layers must be torn down rather than left showing the old
-    // state's data under the new state's map.
-    if (lastSyncedStateId.current !== null && lastSyncedStateId.current !== activeStateId) {
-      const previousState = getState(lastSyncedStateId.current);
-      for (const layerId of loadedLayerIds.current) {
-        const previousLayer = previousState?.layers.find((l) => l.id === layerId);
-        if (previousLayer) {
-          for (const spec of buildLayerSpecs(previousLayer, `src-${layerId}`)) {
-            if (map.getLayer(spec.id)) map.removeLayer(spec.id);
-          }
+    // Remove data belonging to states that are no longer part of this view.
+    for (const key of Array.from(loadedLayerIds.current)) {
+      const [stateId, layerId] = key.split(":");
+      if (!stateId || !layerId || wantedStateIds.has(stateId)) continue;
+      const previousState = getState(stateId);
+      const previousLayer = previousState?.layers.find((layer) => layer.id === layerId);
+      const sourceId = `src-${stateId}-${layerId}`;
+      if (previousLayer) {
+        for (const spec of buildLayerSpecs(previousLayer, sourceId, stateId)) {
+          if (map.getLayer(spec.id)) map.removeLayer(spec.id);
         }
-        if (map.getSource(`src-${layerId}`)) map.removeSource(`src-${layerId}`);
       }
-      loadedLayerIds.current.clear();
-      loadingLayerIds.current.clear();
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+      loadedLayerIds.current.delete(key);
+      loadingLayerIds.current.delete(key);
     }
-    lastSyncedStateId.current = activeStateId;
 
     async function syncLayers() {
-      for (const layer of state.layers) {
-        // Visual raster layers (forest cover, terrain relief) are loaded directly
-        // by MapLibre in their own effects below, not through the GeoJSON API.
-        if (layer.geometryType === "raster") continue;
-        const wantVisible = Boolean(layerVisibility[layer.id]);
-        const sourceId = `src-${layer.id}`;
+      for (const state of states) {
+        const bboxParam = stateBboxParam(state.id);
+        for (const layer of state.layers) {
+          if (layer.geometryType === "raster") continue;
 
-        if (!loadedLayerIds.current.has(layer.id)) {
-          if (!wantVisible) continue;
-          if (loadingLayerIds.current.has(layer.id)) continue;
-          loadingLayerIds.current.add(layer.id);
-          try {
-            const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${activeStateId}`);
-            const data = (await res.json()) as FeatureCollection;
-            if (!mapRef.current || lastSyncedStateId.current !== activeStateId) return;
-            if (!map.getSource(sourceId)) {
-              map.addSource(sourceId, { type: "geojson", data });
-              const specs = buildLayerSpecs(layer, sourceId);
-              for (const spec of specs) {
-                if (!map.getLayer(spec.id)) map.addLayer(spec);
+          const key = `${state.id}:${layer.id}`;
+          const wantVisible = Boolean(layerVisibility[layer.id]);
+          const sourceId = `src-${state.id}-${layer.id}`;
+
+          if (!loadedLayerIds.current.has(key)) {
+            if (!wantVisible || loadingLayerIds.current.has(key)) continue;
+            loadingLayerIds.current.add(key);
+            try {
+              const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
+              const data = (await res.json()) as FeatureCollection;
+              if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
+              if (!map.getSource(sourceId)) {
+                map.addSource(sourceId, { type: "geojson", data });
+                const specs = buildLayerSpecs(layer, sourceId, state.id);
+                for (const spec of specs) {
+                  if (!map.getLayer(spec.id)) map.addLayer(spec);
+                }
+                const interactionKey = `${state.id}:${layer.id}`;
+                if (!interactivityAttached.current.has(interactionKey)) {
+                  attachInteractivity(map, layer, popupRef, state.id);
+                  interactivityAttached.current.add(interactionKey);
+                }
               }
-              if (!interactivityAttached.current.has(layer.id)) {
-                attachInteractivity(map, layer, popupRef);
-                interactivityAttached.current.add(layer.id);
-              }
+              loadedLayerIds.current.add(key);
+            } catch (err) {
+              console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
+            } finally {
+              loadingLayerIds.current.delete(key);
             }
-            loadedLayerIds.current.add(layer.id);
-          } catch (err) {
-            console.error(`Failed to load layer ${layer.id}`, err);
-          } finally {
-            loadingLayerIds.current.delete(layer.id);
-          }
-        } else {
-          const specs = buildLayerSpecs(layer, sourceId);
-          for (const spec of specs) {
-            if (map.getLayer(spec.id)) {
-              map.setLayoutProperty(spec.id, "visibility", wantVisible ? "visible" : "none");
+          } else {
+            const specs = buildLayerSpecs(layer, sourceId, state.id);
+            for (const spec of specs) {
+              if (map.getLayer(spec.id)) {
+                map.setLayoutProperty(spec.id, "visibility", wantVisible ? "visible" : "none");
+              }
             }
           }
         }
@@ -303,7 +326,7 @@ export default function MapView() {
     }
 
     syncLayers();
-  }, [mapReady, activeStateId, layerVisibility]);
+  }, [mapReady, activeStateId, showAllStates, layerVisibility]);
 
   // ---- U.S. visual forest cover ----
   useEffect(() => {
@@ -627,9 +650,10 @@ function fitMinZoomToBounds(map: maplibregl.Map) {
 function attachInteractivity(
   map: maplibregl.Map,
   layer: LayerDefinition,
-  popupRef: React.MutableRefObject<maplibregl.Popup | null>
+  popupRef: React.MutableRefObject<maplibregl.Popup | null>,
+  idPrefix = ""
 ) {
-  for (const mlLayerId of interactiveLayerIds(layer)) {
+  for (const mlLayerId of interactiveLayerIds(layer, idPrefix)) {
     map.on("mouseenter", mlLayerId, () => {
       map.getCanvas().style.cursor = "pointer";
     });

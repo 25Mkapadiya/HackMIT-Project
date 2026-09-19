@@ -2,8 +2,13 @@ import type { DataDrivenPropertyValueSpecification, LayerSpecification } from "m
 import type { LayerDefinition } from "@/lib/types";
 
 /** Builds the MapLibre layer spec(s) for a given layer definition + its GeoJSON source id. */
-export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): LayerSpecification[] {
+export function buildLayerSpecs(
+  layer: LayerDefinition,
+  sourceId: string,
+  idPrefix = ""
+): LayerSpecification[] {
   const baseColor = layer.color ?? "#8fa3bf";
+  const mapLayerId = idPrefix ? `${idPrefix}-${layer.id}` : layer.id;
 
   if (layer.id === "transmission-lines") {
     const voltageColor: DataDrivenPropertyValueSpecification<string> = [
@@ -30,7 +35,7 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
     ];
     return [
       {
-        id: `${layer.id}-line`,
+        id: `${mapLayerId}-line`,
         type: "line",
         source: sourceId,
         paint: {
@@ -45,7 +50,7 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
   if (layer.id === "flood-zones") {
     return [
       {
-        id: `${layer.id}-fill`,
+        id: `${mapLayerId}-fill`,
         type: "fill",
         source: sourceId,
         paint: {
@@ -54,7 +59,7 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
         },
       },
       {
-        id: `${layer.id}-outline`,
+        id: `${mapLayerId}-outline`,
         type: "line",
         source: sourceId,
         paint: { "line-color": ["match", ["get", "SFHA_TF"], "T", "#e0524a", "#e0a84a"], "line-width": 1 },
@@ -66,7 +71,7 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
     case "line":
       return [
         {
-          id: `${layer.id}-line`,
+          id: `${mapLayerId}-line`,
           type: "line",
           source: sourceId,
           paint: { "line-color": baseColor, "line-width": 1.4, "line-opacity": 0.85 },
@@ -75,13 +80,13 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
     case "polygon":
       return [
         {
-          id: `${layer.id}-fill`,
+          id: `${mapLayerId}-fill`,
           type: "fill",
           source: sourceId,
           paint: { "fill-color": baseColor, "fill-opacity": 0.16 },
         },
         {
-          id: `${layer.id}-outline`,
+          id: `${mapLayerId}-outline`,
           type: "line",
           source: sourceId,
           paint: { "line-color": baseColor, "line-width": 1.1, "line-opacity": 0.8 },
@@ -91,7 +96,7 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
     default:
       return [
         {
-          id: `${layer.id}-point`,
+          id: `${mapLayerId}-point`,
           type: "circle",
           source: sourceId,
           paint: {
@@ -106,15 +111,16 @@ export function buildLayerSpecs(layer: LayerDefinition, sourceId: string): Layer
   }
 }
 
-export function interactiveLayerIds(layer: LayerDefinition): string[] {
-  if (layer.id === "transmission-lines") return [`${layer.id}-line`];
-  if (layer.id === "flood-zones") return [`${layer.id}-fill`];
+export function interactiveLayerIds(layer: LayerDefinition, idPrefix = ""): string[] {
+  const mapLayerId = idPrefix ? `${idPrefix}-${layer.id}` : layer.id;
+  if (layer.id === "transmission-lines") return [`${mapLayerId}-line`];
+  if (layer.id === "flood-zones") return [`${mapLayerId}-fill`];
   switch (layer.geometryType) {
     case "line":
-      return [`${layer.id}-line`];
+      return [`${mapLayerId}-line`];
     case "polygon":
-      return [`${layer.id}-fill`];
+      return [`${mapLayerId}-fill`];
     default:
-      return [`${layer.id}-point`];
+      return [`${mapLayerId}-point`];
   }
 }

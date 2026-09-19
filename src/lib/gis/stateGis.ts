@@ -35,6 +35,10 @@ import { TX_LAYER_FETCHERS } from "@/states/texas/layerFetchers";
 import { TX_SOURCES } from "@/states/texas/sources";
 import { DE_LAYER_FETCHERS } from "@/states/delaware/layerFetchers";
 import { DE_SOURCES } from "@/states/delaware/sources";
+import { MO_LAYER_FETCHERS } from "@/states/missouri/layerFetchers";
+import { MO_SOURCES } from "@/states/missouri/sources";
+import { IL_LAYER_FETCHERS } from "@/states/illinois/layerFetchers";
+import { IL_SOURCES } from "@/states/illinois/sources";
 
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
@@ -438,6 +442,44 @@ const DELAWARE_BUNDLE = buildStandardBundle({
   },
 });
 
+const MISSOURI_BUNDLE = buildStandardBundle({
+  fetchers: MO_LAYER_FETCHERS,
+  hifldTransmission: MO_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MO_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MO_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO/SPP",
+  environmentalReviewNote:
+    "Missouri has no statewide zoning database, so county/municipal land-use review remains site-specific. Flood exposure along the Missouri and Mississippi river corridors and New Madrid seismic risk in southeast Missouri should be screened alongside Missouri DNR environmental constraints.",
+  permittingNote: {
+    text: "Large facilities in Missouri typically require county or municipal site-plan/zoning review plus large-load coordination with the serving utility. Missouri spans both MISO and SPP footprints, so the applicable grid-planning process depends on the site and utility. The Missouri Data Center Sales Tax Exemption is a potential incentive only; project eligibility must be verified separately.",
+    source: {
+      id: "mo-permitting-general",
+      name: "Missouri data-center siting — general regulatory context",
+      url: "https://ded.mo.gov/",
+      methodology: "General state/local regulatory context; not a jurisdiction-specific legal determination or utility capacity finding.",
+    },
+  },
+});
+
+const ILLINOIS_BUNDLE = buildStandardBundle({
+  fetchers: IL_LAYER_FETCHERS,
+  hifldTransmission: IL_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: IL_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: IL_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM/MISO",
+  environmentalReviewNote:
+    "Illinois has no statewide zoning layer — county/municipal site-plan review is the primary local gating process. Illinois is split between PJM (ComEd territory in northern Illinois, including the Chicago-area data-center cluster) and MISO (Ameren Illinois territory in central/southern Illinois), so the applicable grid-planning process depends on where the site falls.",
+  permittingNote: {
+    text: "Large facilities in Illinois typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (ComEd or Ameren Illinois) and the applicable regional grid operator (PJM in northern Illinois, MISO in central/southern Illinois). Illinois offers a data-center sales/use-tax exemption program (certified through the Department of Commerce and Economic Opportunity) with investment and job-creation requirements. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "il-permitting-general",
+      name: "Illinois data-center siting — general regulatory context",
+      url: "https://dceo.illinois.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -456,6 +498,8 @@ const BUNDLES: Record<string, StateGisBundle> = {
   maryland: MARYLAND_BUNDLE,
   texas: TEXAS_BUNDLE,
   delaware: DELAWARE_BUNDLE,
+  missouri: MISSOURI_BUNDLE,
+  illinois: ILLINOIS_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {
