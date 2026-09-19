@@ -63,7 +63,7 @@ export default function TopBar() {
             G
           </div>
           <div className="leading-tight">
-            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">GEO: Geographical Energy Outcomes</div>
+            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">GEO: Graphical Energy Outcomes</div>
             <div className="text-[9.5px] text-ink-500 tracking-wide -mt-0.5 truncate max-w-[240px]">{subtitle}</div>
           </div>
         </div>
