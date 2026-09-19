@@ -29,6 +29,7 @@ export const IA_SOURCES = {
   usgsShadedRelief: NATIONAL_SOURCES.usgsShadedRelief,
   censusAcs: NATIONAL_SOURCES.censusAcs,
   censusTiger: NATIONAL_SOURCES.censusTiger,
+  censusCountyDensity: NATIONAL_SOURCES.censusCountyDensity,
   censusGeocoder: NATIONAL_SOURCES.censusGeocoder,
   eia: NATIONAL_SOURCES.eia,
   peeringDb: NATIONAL_SOURCES.peeringDb,
