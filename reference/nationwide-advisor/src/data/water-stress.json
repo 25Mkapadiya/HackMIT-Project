@@ -1,0 +1,14 @@
+{
+  "_source": "Illustrative water-reserve baseline (0-100, higher = more slack) by state, loosely patterned after publicly reported regional water-stress rankings (arid Southwest/Interior West lower, Great Lakes/Northeast/Pacific Northwest higher). Not a live hydrology feed — a placeholder for a real source (e.g. USGS/WRI Aqueduct) in production.",
+  "AL": 78, "AK": 92, "AZ": 32, "AR": 74, "CA": 40,
+  "CO": 44, "CT": 80, "DE": 76, "DC": 74, "FL": 62,
+  "GA": 70, "HI": 66, "ID": 52, "IL": 78, "IN": 76,
+  "IA": 74, "KS": 46, "KY": 80, "LA": 76, "ME": 90,
+  "MD": 76, "MA": 82, "MI": 92, "MN": 84, "MS": 78,
+  "MO": 72, "MT": 60, "NE": 56, "NV": 26, "NH": 88,
+  "NJ": 74, "NM": 30, "NY": 84, "NC": 74, "ND": 62,
+  "OH": 80, "OK": 44, "OR": 66, "PA": 82, "RI": 80,
+  "SC": 74, "SD": 58, "TN": 78, "TX": 38, "UT": 30,
+  "VT": 90, "VA": 76, "WA": 68, "WV": 82, "WI": 88,
+  "WY": 48, "PR": 60
+}

@@ -1,5 +1,6 @@
 # deps
 /node_modules
+reference/**/node_modules
 
 # next
 /.next/
@@ -7,6 +8,7 @@
 
 # production
 /build
+reference/**/dist/
 
 # misc
 .DS_Store
