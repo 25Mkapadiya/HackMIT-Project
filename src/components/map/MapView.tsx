@@ -6,7 +6,7 @@ import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import { booleanPointInPolygon, point } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { WASHINGTON } from "@/states/washington";
-import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
+import { getState, getEnabledStates, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
 import type { LayerDefinition } from "@/lib/types";
@@ -26,7 +26,7 @@ function stateBboxParam(stateId: string): string {
 }
 
 function implementedStatesBounds(): [[number, number], [number, number]] {
-  const states = getEnabledStates();
+  const states = getShowAllStates();
   if (states.length === 0) return getState(DEFAULT_STATE_ID)!.bounds;
   return [
     [
@@ -84,7 +84,7 @@ export default function MapView() {
   useEffect(() => {
     if (preloadPromiseRef.current) return;
 
-    const states = getEnabledStates();
+    const states = getShowAllStates();
     const tasks: Array<() => Promise<void>> = [];
 
     for (const state of states) {
@@ -402,7 +402,7 @@ export default function MapView() {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
     const states = showAllStates
-      ? getEnabledStates()
+      ? getShowAllStates()
       : [getState(activeStateId) ?? getState(DEFAULT_STATE_ID)!];
     const wantedStateIds = new Set(states.map((state) => state.id));
     const viewKey = showAllStates
