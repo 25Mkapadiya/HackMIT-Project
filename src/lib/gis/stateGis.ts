@@ -27,6 +27,14 @@ import { NC_LAYER_FETCHERS } from "@/states/northcarolina/layerFetchers";
 import { NC_SOURCES } from "@/states/northcarolina/sources";
 import { VA_LAYER_FETCHERS } from "@/states/virginia/layerFetchers";
 import { VA_SOURCES } from "@/states/virginia/sources";
+import { WV_LAYER_FETCHERS } from "@/states/westvirginia/layerFetchers";
+import { WV_SOURCES } from "@/states/westvirginia/sources";
+import { MD_LAYER_FETCHERS } from "@/states/maryland/layerFetchers";
+import { MD_SOURCES } from "@/states/maryland/sources";
+import { TX_LAYER_FETCHERS } from "@/states/texas/layerFetchers";
+import { TX_SOURCES } from "@/states/texas/sources";
+import { DE_LAYER_FETCHERS } from "@/states/delaware/layerFetchers";
+import { DE_SOURCES } from "@/states/delaware/sources";
 
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
@@ -349,6 +357,87 @@ const VIRGINIA_BUNDLE = buildStandardBundle({
   },
 });
 
+const WEST_VIRGINIA_BUNDLE = buildStandardBundle({
+  fetchers: WV_LAYER_FETCHERS,
+  hifldTransmission: WV_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: WV_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: WV_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM",
+  environmentalReviewNote:
+    "West Virginia has no statewide zoning layer — county/municipal site-plan review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. West Virginia markets itself as a lower-cost alternative to Northern Virginia, with the Eastern Panhandle (Berkeley/Jefferson counties) the primary growth corridor.",
+  permittingNote: {
+    text: "Large facilities in West Virginia typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (Appalachian Power, Monongahela Power, Potomac Edison, or Wheeling Power) and PJM Interconnection. West Virginia has enacted high-impact data-center legislation with special property-tax valuation treatment and sales-tax exemptions on qualifying technology equipment. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "wv-permitting-general",
+      name: "West Virginia data-center siting — general regulatory context",
+      url: "https://westvirginia.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const MARYLAND_BUNDLE = buildStandardBundle({
+  fetchers: MD_LAYER_FETCHERS,
+  hifldTransmission: MD_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MD_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MD_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM",
+  environmentalReviewNote:
+    "Maryland has no statewide zoning layer — county/municipal site-plan review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. Maryland recently enacted large-load-customer registration and reporting requirements.",
+  permittingNote: {
+    text: "Large facilities in Maryland typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (BGE, Pepco, Delmarva Power, Potomac Edison, or SMECO) and PJM Interconnection. Maryland offers the Data Center Maryland Sales and Use Tax Exemption Incentive Program, generally requiring Commerce certification, at least five qualified positions, and minimum investment, with a 10-20 year benefit period. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "md-permitting-general",
+      name: "Maryland data-center siting — general regulatory context",
+      url: "https://commerce.maryland.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const TEXAS_BUNDLE: StateGisBundle = {
+  fetchers: TX_LAYER_FETCHERS,
+  transmissionSource: TX_SOURCES.hifldTransmission,
+  utilityTerritorySource: TX_SOURCES.hifldUtilityTerritories,
+  utilityTerritoryCaveats: [STANDARD_HIFLD_UTILITY_CAVEAT],
+  // Texas is the one state in this integration with a real, live statewide
+  // water-rights points layer (TCEQ's Water Rights Viewer) — see sources.ts.
+  waterRightsSource: TX_SOURCES.tceqWaterRights,
+  droughtSource: TX_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ERCOT",
+  environmentalReviewNote:
+    "Texas has no statewide zoning layer — county/municipal site-plan review is the primary local gating process. Most of Texas operates within ERCOT, a standalone grid outside the traditional RTO structure — whether a site is inside or outside ERCOT is a major siting factor, and water availability varies significantly by region and should be evaluated site-by-site.",
+  permittingNote: {
+    text: "Large facilities in Texas typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (e.g. Oncor, CenterPoint Energy, AEP Texas, or a municipal/cooperative provider) and ERCOT (or the applicable non-ERCOT interconnection, in parts of the state outside ERCOT). Texas offers a statewide sales-tax exemption for qualifying data centers (≥100,000 sq ft) and a separate certification path for qualifying large data-center projects, both administered by the Texas Comptroller. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "tx-permitting-general",
+      name: "Texas data-center siting — general regulatory context",
+      url: "https://comptroller.texas.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+  roads: null,
+};
+
+const DELAWARE_BUNDLE = buildStandardBundle({
+  fetchers: DE_LAYER_FETCHERS,
+  hifldTransmission: DE_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: DE_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: DE_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM",
+  environmentalReviewNote:
+    "Delaware has no statewide zoning layer — county/municipal site-plan review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. Delaware's small, compact geography and coastal/bay exposure make flood risk an important site-specific consideration.",
+  permittingNote: {
+    text: "Large facilities in Delaware typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (Delmarva Power or the Delaware Electric Cooperative) and PJM Interconnection. Delaware does not have a dedicated statewide data-center tax-incentive program comparable to neighboring states — general economic-development and technology-investment programs would need project-by-project review. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "de-permitting-general",
+      name: "Delaware data-center siting — general regulatory context",
+      url: "https://business.delaware.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -363,6 +452,10 @@ const BUNDLES: Record<string, StateGisBundle> = {
   southcarolina: SOUTH_CAROLINA_BUNDLE,
   northcarolina: NORTH_CAROLINA_BUNDLE,
   virginia: VIRGINIA_BUNDLE,
+  westvirginia: WEST_VIRGINIA_BUNDLE,
+  maryland: MARYLAND_BUNDLE,
+  texas: TEXAS_BUNDLE,
+  delaware: DELAWARE_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {

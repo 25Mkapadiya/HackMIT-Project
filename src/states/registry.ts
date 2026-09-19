@@ -12,6 +12,10 @@ import { GEORGIA } from "./georgia";
 import { SOUTH_CAROLINA } from "./southcarolina";
 import { NORTH_CAROLINA } from "./northcarolina";
 import { VIRGINIA } from "./virginia";
+import { WEST_VIRGINIA } from "./westvirginia";
+import { MARYLAND } from "./maryland";
+import { TEXAS } from "./texas";
+import { DELAWARE } from "./delaware";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -42,6 +46,10 @@ const LIVE_STATES: StateDefinition[] = [
   SOUTH_CAROLINA,
   NORTH_CAROLINA,
   VIRGINIA,
+  WEST_VIRGINIA,
+  MARYLAND,
+  TEXAS,
+  DELAWARE,
 ];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(
