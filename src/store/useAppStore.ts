@@ -9,6 +9,10 @@ type AnalysisState =
   | { status: "ready"; data: ScenarioAnalysis };
 
 interface AppState {
+  // active state (for the state picker / multi-state architecture preview)
+  activeStateId: string;
+  setActiveStateId: (id: string) => void;
+
   // layers
   layerVisibility: Record<string, boolean>;
   toggleLayer: (id: string) => void;
@@ -52,6 +56,9 @@ export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "l
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
+  activeStateId: "washington",
+  setActiveStateId: (id) => set({ activeStateId: id }),
+
   layerVisibility: Object.fromEntries(WASHINGTON.layers.map((l) => [l.id, Boolean(l.defaultVisible)])),
   toggleLayer: (id) =>
     set((s) => ({ layerVisibility: { ...s.layerVisibility, [id]: !s.layerVisibility[id] } })),

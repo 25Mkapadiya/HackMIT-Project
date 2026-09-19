@@ -6,6 +6,7 @@ import type { FeatureCollection } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { WASHINGTON } from "@/states/washington";
 import { getWaLayer } from "@/states/washington/layers";
+import { getState } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
 import { BASEMAP_STYLE, emptyFeatureCollection } from "./mapStyle";
@@ -31,6 +32,7 @@ export default function MapView() {
   const proposeMode = useAppStore((s) => s.proposeMode);
   const scenarios = useAppStore((s) => s.scenarios);
   const activeScenarioId = useAppStore((s) => s.activeScenarioId);
+  const activeStateId = useAppStore((s) => s.activeStateId);
   const addScenario = useAppStore((s) => s.addScenario);
   const setActiveScenario = useAppStore((s) => s.setActiveScenario);
 
@@ -131,6 +133,20 @@ export default function MapView() {
       map.off("click", handleClick);
     };
   }, [mapReady, proposeMode, addScenario]);
+
+  // ---- fly to the picked state's real bounds (state picker in TopBar) ----
+  const isFirstStateSync = useRef(true);
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    if (isFirstStateSync.current) {
+      // Skip the initial mount — the map already opens on Washington's bounds.
+      isFirstStateSync.current = false;
+      return;
+    }
+    const state = getState(activeStateId);
+    if (!state) return;
+    mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
+  }, [mapReady, activeStateId]);
 
   // ---- load/toggle infrastructure layers ----
   useEffect(() => {
