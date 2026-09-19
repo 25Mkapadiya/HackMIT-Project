@@ -75,6 +75,8 @@ export interface CountyScore {
   name: string;
   statePostal: string | null;
   blocked: boolean;
+  paused: boolean;
+  substationAdjacent: boolean;
   score: number;
   tier: TierInfo;
   breakdown: {

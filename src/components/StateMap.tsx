@@ -55,7 +55,13 @@ export default function StateMap({
         const d = path(f) ?? undefined;
         const isSelected = selectedFips === fips;
         const isHovered = hoveredFips === fips;
-        const fill = s ? (s.blocked ? "url(#blockedHatch)" : scoreColor(s.score)) : "#26323d";
+        const fill = s
+          ? s.blocked
+            ? "url(#blockedHatch)"
+            : s.paused
+            ? "var(--paused)"
+            : scoreColor(s.score)
+          : "#26323d";
         return (
           <path
             key={fips}
@@ -65,7 +71,8 @@ export default function StateMap({
               "county-path" +
               (isSelected ? " selected" : "") +
               (isHovered ? " hovered" : "") +
-              (s?.blocked ? " blocked" : "")
+              (s?.blocked ? " blocked" : "") +
+              (s?.paused ? " paused" : "")
             }
             onMouseEnter={() => onHover(fips)}
             onMouseLeave={() => onHover(null)}
@@ -73,9 +80,31 @@ export default function StateMap({
           >
             <title>
               {f.properties.name}
-              {s ? (s.blocked ? " — blocked" : ` — score ${s.score} (${s.tier.label})`) : ""}
+              {s
+                ? s.blocked
+                  ? " — blocked"
+                  : s.paused
+                  ? ` — local pause in effect (would score ${s.score})`
+                  : ` — score ${s.score} (${s.tier.label})`
+                : ""}
             </title>
           </path>
+        );
+      })}
+      {counties.features.map((f) => {
+        const fips = f.properties.fips;
+        const s = scores.get(fips);
+        if (!s?.substationAdjacent) return null;
+        const centroid = path.centroid(f);
+        if (centroid.some((n) => Number.isNaN(n))) return null;
+        return (
+          <circle
+            key={`ring-${fips}`}
+            className="substation-ring"
+            cx={centroid[0]}
+            cy={centroid[1]}
+            r={4}
+          />
         );
       })}
       {counties.features.map((f) => {
