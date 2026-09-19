@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import { booleanPointInPolygon, point } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { WASHINGTON } from "@/states/washington";
 import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
@@ -44,6 +45,7 @@ export default function MapView() {
   // string, so they only need registering once, ever, per layer id.
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const usBoundaryRef = useRef<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
   const focusedScenarioIdRef = useRef<string | null>(null);
   const focusAnimatingRef = useRef(false);
@@ -211,6 +213,28 @@ export default function MapView() {
     }
   }, [scenarios, activeScenarioId, activeStateId, showAllStates, mapReady]);
 
+  // ---- load authoritative U.S. state boundaries used to validate proposed sites ----
+  useEffect(() => {
+    if (!mapReady) return;
+    let cancelled = false;
+
+    fetch("/api/us-boundary")
+      .then((res) => {
+        if (!res.ok) throw new Error(`U.S. boundary request failed (${res.status})`);
+        return res.json() as Promise<FeatureCollection<Polygon | MultiPolygon>>;
+      })
+      .then((data) => {
+        if (!cancelled) usBoundaryRef.current = data;
+      })
+      .catch((err) => {
+        console.error("Failed to load U.S. placement boundary", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady]);
+
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -220,6 +244,24 @@ export default function MapView() {
 
     if (!proposeMode) return;
     const handleClick = (e: maplibregl.MapMouseEvent) => {
+      const boundary = usBoundaryRef.current;
+      const clickedPoint = point([e.lngLat.lng, e.lngLat.lat]);
+      const insideUnitedStates =
+        boundary?.features.some((feature) => booleanPointInPolygon(clickedPoint, feature)) ?? false;
+
+      if (!insideUnitedStates) {
+        popupRef.current?.remove();
+        popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
+          .setLngLat(e.lngLat)
+          .setHTML(
+            boundary
+              ? "<strong>U.S. locations only</strong><br/>Data centers can only be placed within a U.S. state."
+              : "<strong>Placement boundary loading</strong><br/>Please try again in a moment."
+          )
+          .addTo(map);
+        return;
+      }
+
       addScenario(e.lngLat.lng, e.lngLat.lat);
     };
     map.on("click", handleClick);

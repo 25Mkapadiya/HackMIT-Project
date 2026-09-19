@@ -466,16 +466,16 @@ const ILLINOIS_BUNDLE = buildStandardBundle({
   hifldTransmission: IL_SOURCES.hifldTransmission,
   hifldUtilityTerritories: IL_SOURCES.hifldUtilityTerritories,
   usDroughtMonitor: IL_SOURCES.usDroughtMonitor,
-  interconnectionAuthorityLabel: "PJM/MISO",
+  interconnectionAuthorityLabel: "MISO/PJM",
   environmentalReviewNote:
-    "Illinois has no statewide zoning layer — county/municipal site-plan review is the primary local gating process. Illinois is split between PJM (ComEd territory in northern Illinois, including the Chicago-area data-center cluster) and MISO (Ameren Illinois territory in central/southern Illinois), so the applicable grid-planning process depends on where the site falls.",
+    "Illinois has no statewide zoning layer, so municipality/county land-use review remains site-specific. Illinois also spans both MISO and PJM planning regions, and large-load service must be coordinated with the serving utility and applicable regional transmission organization. Data-center incentive policy is under active review in 2026.",
   permittingNote: {
-    text: "Large facilities in Illinois typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (ComEd or Ameren Illinois) and the applicable regional grid operator (PJM in northern Illinois, MISO in central/southern Illinois). Illinois offers a data-center sales/use-tax exemption program (certified through the Department of Commerce and Economic Opportunity) with investment and job-creation requirements. Utility interconnection is a separate process from land-use permitting.",
+    text: "Large facilities in Illinois typically require municipal or county zoning/site-plan review plus large-load coordination with the serving utility (such as ComEd, Ameren Illinois, MidAmerican Energy, a municipal utility, or a cooperative) and the applicable MISO or PJM process. Illinois Data Center Investment Program processing for new agreements was paused beginning July 1, 2026 while policy reforms are considered. Utility interconnection is separate from land-use permitting.",
     source: {
       id: "il-permitting-general",
       name: "Illinois data-center siting — general regulatory context",
-      url: "https://dceo.illinois.gov",
-      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+      url: "https://dceo.illinois.gov/expandrelocate/incentives/datacenters.html",
+      methodology: "General statewide regulatory context from Illinois public sources; not a jurisdiction-specific legal determination.",
     },
   },
 });
