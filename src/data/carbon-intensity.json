@@ -1,0 +1,14 @@
+{
+  "_source": "Illustrative approximations of average annual grid carbon intensity (gCO2eq/kWh) by state, patterned after publicly reported EPA eGRID subregion generation mixes. Not a live pull from Electricity Maps — swap in their API for production use. Values are directional, for demo ranking only.",
+  "AL": 420, "AK": 480, "AZ": 340, "AR": 430, "CA": 210,
+  "CO": 470, "CT": 220, "DE": 380, "DC": 300, "FL": 400,
+  "GA": 380, "HI": 650, "ID": 90, "IL": 350, "IN": 620,
+  "IA": 330, "KS": 480, "KY": 700, "LA": 430, "ME": 130,
+  "MD": 330, "MA": 280, "MI": 460, "MN": 400, "MS": 430,
+  "MO": 650, "MT": 480, "NE": 550, "NV": 320, "NH": 150,
+  "NJ": 280, "NM": 490, "NY": 220, "NC": 380, "ND": 600,
+  "OH": 500, "OK": 440, "OR": 100, "PA": 370, "RI": 380,
+  "SC": 300, "SD": 250, "TN": 350, "TX": 400, "UT": 560,
+  "VT": 20, "VA": 320, "WA": 90, "WV": 780, "WI": 480,
+  "WY": 760, "PR": 550
+}
