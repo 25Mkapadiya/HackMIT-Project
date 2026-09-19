@@ -1,9 +1,9 @@
 import * as turf from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, Polygon, MultiPolygon } from "geojson";
 import type { LandAnalysis, ScenarioConfig } from "@/lib/types";
-import { WA_LAYER_FETCHERS } from "@/lib/gis/layerFetchers";
+import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
+import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, milesBetween, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
-import { WA_SOURCES } from "@/states/washington/sources";
 import { ACREAGE_PER_MW, POPULATION_RADIUS_MI } from "@/lib/constants/assumptions";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 
@@ -112,16 +112,19 @@ async function getPopulationWithin5mi(
 }
 
 export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<LandAnalysis> {
-  const { lng, lat, mwLoad, acreageOverride } = scenario;
+  const { lng, lat, mwLoad, acreageOverride, stateId } = scenario;
+  const bundle = getStateGisBundle(stateId);
 
   const floodBbox = bboxAroundMiles(lng, lat, 5);
   const roadBbox = bboxAroundMiles(lng, lat, 15);
   const tractBbox = bboxAroundMiles(lng, lat, POPULATION_RADIUS_MI + 2);
 
   const [floodFc, roadsFc, tractsFc, elevationFt] = await Promise.all([
-    WA_LAYER_FETCHERS["flood-zones"]!(floodBbox) as Promise<FeatureCollection<Geometry, FloodProps>>,
-    WA_LAYER_FETCHERS["state-highways"]!(roadBbox) as Promise<FeatureCollection<Geometry, RoadProps>>,
-    WA_LAYER_FETCHERS["population-tracts"]!(tractBbox) as Promise<FeatureCollection<Geometry, TractProps>>,
+    getFetcher(stateId, "flood-zones")(floodBbox) as Promise<FeatureCollection<Geometry, FloodProps>>,
+    bundle.roads
+      ? (getFetcher(stateId, bundle.roads.layerId)(roadBbox) as Promise<FeatureCollection<Geometry, RoadProps>>)
+      : Promise.resolve<FeatureCollection<Geometry, RoadProps>>({ type: "FeatureCollection", features: [] }),
+    getFetcher(stateId, "population-tracts")(tractBbox) as Promise<FeatureCollection<Geometry, TractProps>>,
     getElevationFt(lng, lat),
   ]);
 
@@ -142,7 +145,7 @@ export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<Lan
   if (floodZone) {
     constraints.push(`Site falls within FEMA flood zone ${zoneCode ?? "(unclassified)"}${isHighRisk ? " — high-risk (SFHA)" : ""}.`);
   }
-  constraints.push("SEPA (WA State Environmental Policy Act) environmental review is likely required for a project of this scale.");
+  constraints.push(bundle.environmentalReviewNote);
 
   const acreage = acreageOverride ?? Math.round(mwLoad * ACREAGE_PER_MW.typical * 10) / 10;
 
@@ -151,7 +154,7 @@ export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<Lan
       label: "FEMA flood zone",
       value: floodZone ? `${zoneCode ?? "Unclassified"}${isHighRisk ? " (high-risk / SFHA)" : ""}` : "Not in a mapped FEMA flood hazard zone (or unmapped area)",
       confidence: "fact",
-      source: WA_SOURCES.femaNfhl,
+      source: NATIONAL_SOURCES.femaNfhl,
       caveats: !floodZone ? ["Absence of a mapped zone can also mean the area has not been studied by FEMA."] : undefined,
     },
     elevationFt: {
@@ -159,28 +162,41 @@ export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<Lan
       value: elevationFt,
       unit: "ft",
       confidence: elevationFt != null ? "fact" : "unknown",
-      source: WA_SOURCES.usgsEpqs,
+      source: NATIONAL_SOURCES.usgsEpqs,
     },
-    nearestMajorRoadMiles: {
-      label: "Nearest state highway (functional class ≤ 3)",
-      value: nearestMajorRoad.distanceMiles,
-      unit: "mi",
-      confidence: nearestMajorRoad.feature ? "fact" : "unknown",
-      source: WA_SOURCES.wsdotHighways,
-      caveats: ["State-route network only — does not include county/city arterials or private access roads."],
-    },
+    nearestMajorRoadMiles: bundle.roads
+      ? {
+          label: bundle.roads.label,
+          value: nearestMajorRoad.distanceMiles,
+          unit: "mi",
+          confidence: nearestMajorRoad.feature ? "fact" : "unknown",
+          source: bundle.roads.source,
+          caveats: ["State-route network only — does not include county/city arterials or private access roads."],
+        }
+      : {
+          label: "Nearest major road",
+          value: null,
+          unit: "mi",
+          confidence: "unknown",
+          source: {
+            id: "no-road-dataset",
+            name: "No road-classification dataset integrated for this state",
+            url: "",
+          },
+          caveats: ["No verified state road-classification GIS layer is integrated for this state yet."],
+        },
     populationWithin5mi: {
       label: `Estimated population within ${POPULATION_RADIUS_MI} mi`,
       value: population.value,
       confidence: population.confidence,
-      source: WA_SOURCES.censusAcs,
+      source: NATIONAL_SOURCES.censusAcs,
       caveats: population.caveats,
     },
     environmentalConstraints: {
       label: "Environmental / regulatory constraints",
       value: constraints,
       confidence: "proxy",
-      source: WA_SOURCES.femaNfhl,
+      source: NATIONAL_SOURCES.femaNfhl,
       caveats: [
         "Not a substitute for a wetlands, species, or cultural-resource survey. Only flood-zone status is derived from GIS data here.",
       ],

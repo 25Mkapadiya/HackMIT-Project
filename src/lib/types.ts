@@ -73,6 +73,8 @@ export interface RedundancyAssumption {
 export interface ScenarioConfig {
   id: string;
   label: string;
+  /** Which StateDefinition's GIS sources/fetchers to run analysis against. */
+  stateId: string;
   lng: number;
   lat: number;
   mwLoad: number;

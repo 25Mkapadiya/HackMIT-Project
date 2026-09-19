@@ -7,6 +7,8 @@ import { cached, TTL } from "@/lib/cache/memoryCache";
  * reject requests without a browser-like User-Agent, so we always send one.
  */
 
+export type Bbox = [number, number, number, number];
+
 export interface ArcGisQueryOptions {
   where?: string;
   outFields?: string;

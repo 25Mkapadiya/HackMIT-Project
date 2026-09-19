@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { WA_LAYER_FETCHERS, type Bbox } from "@/lib/gis/layerFetchers";
+import type { Bbox } from "@/lib/gis/arcgis";
+import { getFetcher } from "@/lib/gis/stateGis";
+import { DEFAULT_STATE_ID } from "@/states/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +14,11 @@ function parseBbox(param: string | null): Bbox | null {
 
 export async function GET(req: NextRequest, { params }: { params: { layerId: string } }) {
   const layerId = params.layerId;
-  const fetcher = WA_LAYER_FETCHERS[layerId];
-
-  if (!fetcher) {
-    return NextResponse.json({ error: `Unknown layer id: ${layerId}` }, { status: 404 });
-  }
+  const stateId = req.nextUrl.searchParams.get("state") || DEFAULT_STATE_ID;
+  // Unimplemented layer for this state degrades to an empty FeatureCollection
+  // (see getFetcher) rather than a 404 — a state should never fail to load
+  // just because one optional layer isn't wired up for it yet.
+  const fetcher = getFetcher(stateId, layerId);
 
   const bbox = parseBbox(req.nextUrl.searchParams.get("bbox"));
   if (!bbox) {

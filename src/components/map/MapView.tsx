@@ -5,26 +5,29 @@ import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { WASHINGTON } from "@/states/washington";
-import { getWaLayer } from "@/states/washington/layers";
-import { getState } from "@/states/registry";
+import { getState, DEFAULT_STATE_ID } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
+import type { LayerDefinition } from "@/lib/types";
 import { BASEMAP_STYLE, US_MAX_BOUNDS, US_MIN_ZOOM, emptyFeatureCollection } from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
 import { buildPopupHtml } from "./popupContent";
 
-const STATEWIDE_BBOX = [
-  WASHINGTON.bounds[0][0],
-  WASHINGTON.bounds[0][1],
-  WASHINGTON.bounds[1][0],
-  WASHINGTON.bounds[1][1],
-].join(",");
+function stateBboxParam(stateId: string): string {
+  const state = getState(stateId) ?? getState(DEFAULT_STATE_ID)!;
+  return [state.bounds[0][0], state.bounds[0][1], state.bounds[1][0], state.bounds[1][1]].join(",");
+}
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
+  // Layer ids (e.g. "transmission-lines") are stable across states even though
+  // the underlying source is swapped out on state switch (see the teardown
+  // logic below) — click/hover handlers are bound to that stable layer id
+  // string, so they only need registering once, ever, per layer id.
+  const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
@@ -141,26 +144,56 @@ export default function MapView() {
   }, [mapReady, proposeMode, addScenario]);
 
   // ---- fly to the picked state's real bounds (state picker in TopBar) ----
-  const isFirstStateSync = useRef(true);
+  // Tracks which state the map is currently showing (seeded with the state active
+  // at first render, before any user interaction is possible) and flies whenever
+  // activeStateId no longer matches it — including back to the original default.
+  // Comparing against a live "last applied" value, updated on every real
+  // transition, avoids a race where switching states before the map's initial
+  // `load` event fires would otherwise be silently swallowed by an ordinal
+  // "skip the first run" guard, while still correctly re-flying if the user
+  // later returns to that same initial state.
+  const lastAppliedStateIdRef = useRef(activeStateId);
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    if (isFirstStateSync.current) {
-      // Skip the initial mount — the map already opens on Washington's bounds.
-      isFirstStateSync.current = false;
-      return;
+    if (activeStateId !== lastAppliedStateIdRef.current) {
+      const state = getState(activeStateId);
+      if (state) {
+        mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
+      }
     }
-    const state = getState(activeStateId);
-    if (!state) return;
-    mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
+    lastAppliedStateIdRef.current = activeStateId;
   }, [mapReady, activeStateId]);
 
   // ---- load/toggle infrastructure layers ----
+  const lastSyncedStateId = useRef<string | null>(null);
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
+    const state = getState(activeStateId) ?? getState(DEFAULT_STATE_ID)!;
+    const bboxParam = stateBboxParam(activeStateId);
+
+    // Switching states: a layer id like "transmission-lines" means a different
+    // upstream dataset per state (see src/lib/gis/stateGis.ts), so the previously
+    // loaded sources/layers must be torn down rather than left showing the old
+    // state's data under the new state's map.
+    if (lastSyncedStateId.current !== null && lastSyncedStateId.current !== activeStateId) {
+      const previousState = getState(lastSyncedStateId.current);
+      for (const layerId of loadedLayerIds.current) {
+        const previousLayer = previousState?.layers.find((l) => l.id === layerId);
+        if (previousLayer) {
+          for (const spec of buildLayerSpecs(previousLayer, `src-${layerId}`)) {
+            if (map.getLayer(spec.id)) map.removeLayer(spec.id);
+          }
+        }
+        if (map.getSource(`src-${layerId}`)) map.removeSource(`src-${layerId}`);
+      }
+      loadedLayerIds.current.clear();
+      loadingLayerIds.current.clear();
+    }
+    lastSyncedStateId.current = activeStateId;
 
     async function syncLayers() {
-      for (const layer of WASHINGTON.layers) {
+      for (const layer of state.layers) {
         // Terrain uses a raster-dem source loaded directly by MapLibre, not the GeoJSON API.
         if (layer.id === "terrain-hillshade") continue;
         const wantVisible = Boolean(layerVisibility[layer.id]);
@@ -171,16 +204,19 @@ export default function MapView() {
           if (loadingLayerIds.current.has(layer.id)) continue;
           loadingLayerIds.current.add(layer.id);
           try {
-            const res = await fetch(`${layer.endpoint}?bbox=${STATEWIDE_BBOX}`);
+            const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${activeStateId}`);
             const data = (await res.json()) as FeatureCollection;
-            if (!mapRef.current) return;
+            if (!mapRef.current || lastSyncedStateId.current !== activeStateId) return;
             if (!map.getSource(sourceId)) {
               map.addSource(sourceId, { type: "geojson", data });
               const specs = buildLayerSpecs(layer, sourceId);
               for (const spec of specs) {
                 if (!map.getLayer(spec.id)) map.addLayer(spec);
               }
-              attachInteractivity(map, layer.id, popupRef);
+              if (!interactivityAttached.current.has(layer.id)) {
+                attachInteractivity(map, layer, popupRef);
+                interactivityAttached.current.add(layer.id);
+              }
             }
             loadedLayerIds.current.add(layer.id);
           } catch (err) {
@@ -200,7 +236,7 @@ export default function MapView() {
     }
 
     syncLayers();
-  }, [mapReady, layerVisibility]);
+  }, [mapReady, activeStateId, layerVisibility]);
 
   // ---- terrain / mountains (public Mapzen Terrain Tiles on AWS) ----
   useEffect(() => {
@@ -334,10 +370,10 @@ function fitMinZoomToBounds(map: maplibregl.Map) {
 
 function attachInteractivity(
   map: maplibregl.Map,
-  layerId: string,
+  layer: LayerDefinition,
   popupRef: React.MutableRefObject<maplibregl.Popup | null>
 ) {
-  for (const mlLayerId of interactiveLayerIds(getWaLayer(layerId)!)) {
+  for (const mlLayerId of interactiveLayerIds(layer)) {
     map.on("mouseenter", mlLayerId, () => {
       map.getCanvas().style.cursor = "pointer";
     });
@@ -350,7 +386,7 @@ function attachInteractivity(
       popupRef.current?.remove();
       popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
         .setLngLat(e.lngLat)
-        .setHTML(buildPopupHtml(layerId, feature.properties ?? {}))
+        .setHTML(buildPopupHtml(layer.id, feature.properties ?? {}))
         .addTo(map);
     });
   }

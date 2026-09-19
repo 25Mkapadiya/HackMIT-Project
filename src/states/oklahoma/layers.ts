@@ -1,0 +1,236 @@
+import type { LayerDefinition } from "@/lib/types";
+import { OK_SOURCES } from "./sources";
+
+/**
+ * Full layer registry for Oklahoma — mirrors src/states/washington/layers.ts
+ * structure/layer ids exactly (so MapView, LayerControlPanel, Legend, and
+ * popupContent.ts all work unmodified) but points at Oklahoma-appropriate
+ * sources: nationwide HIFLD/USGS/FEMA/Census/PeeringDB/EIA data reused as-is,
+ * plus Oklahoma-specific OWRB water-rights data. See src/lib/gis/nationalSources.ts
+ * and src/states/oklahoma/layerFetchers.ts for where each layer's data comes from.
+ */
+export const OK_LAYERS: LayerDefinition[] = [
+  // ---------------------------------------------------------------- POWER
+  {
+    id: "transmission-lines",
+    name: "Electric Power Transmission Lines",
+    shortName: "Transmission",
+    category: "power",
+    geometryType: "line",
+    source: OK_SOURCES.hifldTransmission,
+    confidence: "fact",
+    description:
+      "HIFLD transmission line geometry and voltage class (nationwide extract, static — see source note). Oklahoma is served primarily by OG&E, PSO, Western Farmers Electric Cooperative, and other cooperatives within the Southwest Power Pool (SPP).",
+    defaultVisible: true,
+    endpoint: "/api/gis/transmission-lines",
+    legend: [
+      { label: "500 kV+", color: "#ff5470", swatch: "line", lineWidth: 3 },
+      { label: "230–499 kV", color: "#f2b93b", swatch: "line", lineWidth: 2.5 },
+      { label: "115–229 kV", color: "#f2d98b", swatch: "line", lineWidth: 2 },
+      { label: "< 115 kV / unknown", color: "#8fa3bf", swatch: "line", lineWidth: 1.5 },
+    ],
+  },
+  {
+    id: "utility-territories",
+    name: "Electric Utility Retail Service Territories",
+    shortName: "Utility Territories",
+    category: "power",
+    geometryType: "polygon",
+    source: OK_SOURCES.hifldUtilityTerritories,
+    confidence: "proxy",
+    description:
+      "HIFLD electric retail service territory boundaries (static 2025-08-21 snapshot). Informational — not an official service determination and will not reflect subsequent changes.",
+    defaultVisible: false,
+    endpoint: "/api/gis/utility-territories",
+    color: "#5b7a9d",
+    legend: [{ label: "Utility territory boundary", color: "#5b7a9d", swatch: "fill" }],
+  },
+
+  // ---------------------------------------------------------------- WATER
+  {
+    id: "hydrography-rivers",
+    name: "Rivers & Streams",
+    category: "water",
+    geometryType: "line",
+    source: OK_SOURCES.usgsNhdFlowline,
+    confidence: "fact",
+    description: "USGS National Hydrography Dataset flowlines (small-scale). Includes the Arkansas, Red, and Canadian river systems.",
+    defaultVisible: true,
+    endpoint: "/api/gis/hydrography-rivers",
+    color: "#3ba9f2",
+    legend: [{ label: "River / stream", color: "#3ba9f2", swatch: "line", lineWidth: 1.5 }],
+  },
+  {
+    id: "hydrography-waterbodies",
+    name: "Water Bodies (Lakes & Reservoirs)",
+    shortName: "Water Bodies",
+    category: "water",
+    geometryType: "polygon",
+    source: OK_SOURCES.usgsNhdWaterbody,
+    confidence: "fact",
+    description: "USGS National Hydrography Dataset waterbody polygons (small-scale), including major reservoirs like Grand Lake and Eufaula Lake.",
+    defaultVisible: true,
+    endpoint: "/api/gis/hydrography-waterbodies",
+    color: "#1f6fa8",
+    legend: [{ label: "Lake / reservoir", color: "#1f6fa8", swatch: "fill" }],
+  },
+  {
+    id: "usgs-gauges",
+    name: "USGS Streamflow Gauges",
+    category: "water",
+    geometryType: "point",
+    source: OK_SOURCES.usgsNwisGauges,
+    confidence: "fact",
+    description: "Active USGS surface-water monitoring stations with current discharge readings.",
+    defaultVisible: false,
+    endpoint: "/api/gis/usgs-gauges",
+    color: "#63d4ff",
+    legend: [{ label: "Active gauge", color: "#63d4ff", swatch: "circle" }],
+  },
+  {
+    id: "water-diversions",
+    name: "Water Right Permits (Surface + Groundwater)",
+    shortName: "Water Rights",
+    category: "water",
+    geometryType: "point",
+    source: OK_SOURCES.owrbSurfaceWaterRights,
+    confidence: "fact",
+    description: "Permitted surface-water diversion points and groundwater wells (Oklahoma Water Resources Board Water Rights Database).",
+    defaultVisible: false,
+    endpoint: "/api/gis/water-diversions",
+    color: "#2ee6c8",
+    legend: [{ label: "Permitted water right", color: "#2ee6c8", swatch: "circle" }],
+  },
+  {
+    id: "drought-areas",
+    name: "U.S. Drought Monitor — Current Conditions",
+    shortName: "Drought",
+    category: "water",
+    geometryType: "polygon",
+    source: OK_SOURCES.usDroughtMonitor,
+    confidence: "fact",
+    description: "Current weekly drought classification (D0 abnormally dry through D4 exceptional drought), released Thursdays by NDMC/NOAA/USDA.",
+    defaultVisible: false,
+    endpoint: "/api/gis/drought-areas",
+    color: "#c9722f",
+    legend: [
+      { label: "D0 Abnormally dry", color: "#f2d98b", swatch: "fill" },
+      { label: "D1–D2 Moderate–severe", color: "#e0a84a", swatch: "fill" },
+      { label: "D3–D4 Extreme–exceptional", color: "#c9722f", swatch: "fill" },
+    ],
+  },
+
+  // --------------------------------------------------------- CONNECTIVITY
+  {
+    id: "colocation-facilities",
+    name: "Colocation / Interconnection Facilities",
+    shortName: "Colo Facilities",
+    category: "connectivity",
+    geometryType: "point",
+    source: OK_SOURCES.peeringDb,
+    confidence: "fact",
+    description:
+      "PeeringDB-listed carrier hotels and colocation facilities — a proxy for interconnection density, not a survey of long-haul fiber routes or the Oklahoma Broadband Map's retail coverage data.",
+    defaultVisible: true,
+    endpoint: "/api/gis/colocation-facilities",
+    color: "#9b6ef2",
+    legend: [{ label: "Colocation / IX facility", color: "#9b6ef2", swatch: "circle" }],
+  },
+
+  // ----------------------------------------------------------- ENVIRONMENT
+  {
+    id: "flood-zones",
+    name: "FEMA Flood Hazard Zones",
+    shortName: "Flood Zones",
+    category: "environment",
+    geometryType: "polygon",
+    source: OK_SOURCES.femaNfhl,
+    confidence: "fact",
+    description: "Effective FEMA National Flood Hazard Layer zones, where mapped. Arkansas River, Red River, and Canadian River corridors are priority areas to check.",
+    defaultVisible: false,
+    endpoint: "/api/gis/flood-zones",
+    color: "#e0524a",
+    legend: [
+      { label: "High risk (A/AE/V zones)", color: "#e0524a", swatch: "fill" },
+      { label: "Moderate/minimal (X/other)", color: "#e0a84a", swatch: "fill" },
+    ],
+  },
+  {
+    id: "national-forest-lands",
+    name: "National Forest System Lands",
+    shortName: "Forests",
+    category: "environment",
+    geometryType: "polygon",
+    source: OK_SOURCES.usfsNationalForestLands,
+    confidence: "fact",
+    description:
+      "USDA Forest Service National Forest System land-unit boundaries (e.g. Ouachita National Forest, Black Kettle National Grassland). Shows federally administered forest/grassland units, not all forest canopy.",
+    defaultVisible: false,
+    endpoint: "/api/gis/national-forest-lands",
+    color: "#4fa86f",
+    legend: [{ label: "National Forest System land", color: "#4fa86f", swatch: "fill" }],
+  },
+  {
+    id: "terrain-hillshade",
+    name: "Terrain / Elevation",
+    shortName: "Terrain",
+    category: "environment",
+    geometryType: "raster",
+    source: OK_SOURCES.mapzenTerrain,
+    confidence: "fact",
+    description: "Bare-earth elevation rendered as hillshade and 3D terrain from the public Mapzen Terrain Tiles dataset on AWS.",
+    defaultVisible: false,
+    color: "#a99b83",
+    legend: [{ label: "Elevation relief", color: "#a99b83", swatch: "fill" }],
+  },
+
+  // -------------------------------------------------------------- COMMUNITY
+  {
+    id: "population-tracts",
+    name: "Census Tract Boundaries",
+    category: "community",
+    geometryType: "polygon",
+    source: OK_SOURCES.censusTiger,
+    confidence: "fact",
+    description: "US Census tract boundaries, used for population-proximity estimates.",
+    defaultVisible: false,
+    endpoint: "/api/gis/population-tracts",
+    color: "#6b7f99",
+    legend: [{ label: "Census tract boundary", color: "#6b7f99", swatch: "line" }],
+  },
+
+  // ----------------------------------------------------- EXISTING INFRA
+  {
+    id: "power-plants",
+    name: "Power Generation Facilities",
+    shortName: "Generation",
+    category: "existing_infrastructure",
+    geometryType: "point",
+    source: OK_SOURCES.eia,
+    confidence: "unknown",
+    description:
+      "Nearby generating facilities from EIA. Oklahoma has substantial wind and natural-gas generation. Requires a server-side EIA_API_KEY — shown as unavailable until configured.",
+    defaultVisible: true,
+    endpoint: "/api/gis/power-plants",
+    color: "#f2b93b",
+    legend: [{ label: "Generating facility", color: "#f2b93b", swatch: "circle" }],
+  },
+  {
+    id: "data-centers",
+    name: "Known / Announced Data Center Campuses",
+    shortName: "Data Centers",
+    category: "existing_infrastructure",
+    geometryType: "point",
+    source: OK_SOURCES.curatedDataCenters,
+    confidence: "proxy",
+    description: "Hand-curated, illustrative list of publicly reported Oklahoma data center campuses/projects. Not exhaustive.",
+    defaultVisible: true,
+    endpoint: "/api/gis/data-centers",
+    color: "#8fa3bf",
+    legend: [{ label: "Existing / announced data center campus", color: "#8fa3bf", swatch: "circle" }],
+  },
+];
+
+export function getOkLayer(id: string): LayerDefinition | undefined {
+  return OK_LAYERS.find((l) => l.id === id);
+}

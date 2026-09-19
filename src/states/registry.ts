@@ -1,5 +1,6 @@
 import type { StateDefinition } from "@/lib/types";
 import { WASHINGTON } from "./washington";
+import { OKLAHOMA } from "./oklahoma";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -16,18 +17,21 @@ import { US_STATES_DIRECTORY } from "./directory";
  * and fly the map to any of them, without claiming analysis coverage that
  * doesn't exist yet.
  */
-const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => s.abbreviation !== "WA").map((s) => ({
-  id: s.id,
-  name: s.name,
-  abbreviation: s.abbreviation,
-  bounds: s.bounds,
-  center: s.center,
-  defaultZoom: 6,
-  layers: [],
-  enabled: false,
-}));
+const LIVE_ABBREVIATIONS = new Set(["WA", "OK"]);
+const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(
+  (s) => ({
+    id: s.id,
+    name: s.name,
+    abbreviation: s.abbreviation,
+    bounds: s.bounds,
+    center: s.center,
+    defaultZoom: 6,
+    layers: [],
+    enabled: false,
+  })
+);
 
-export const STATE_REGISTRY: StateDefinition[] = [WASHINGTON, ...STUB_STATES].sort((a, b) =>
+export const STATE_REGISTRY: StateDefinition[] = [WASHINGTON, OKLAHOMA, ...STUB_STATES].sort((a, b) =>
   a.name.localeCompare(b.name)
 );
 

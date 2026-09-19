@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import type { CoolingMedium, CoolingTechnology, LoopType, ScenarioAnalysis, ScenarioConfig } from "@/lib/types";
 import { WASHINGTON } from "@/states/washington";
+import { getState, DEFAULT_STATE_ID } from "@/states/registry";
+
+function defaultLayerVisibility(stateId: string): Record<string, boolean> {
+  const layers = getState(stateId)?.layers ?? WASHINGTON.layers;
+  return Object.fromEntries(layers.map((l) => [l.id, Boolean(l.defaultVisible)]));
+}
 
 type AnalysisState =
   | { status: "idle" }
@@ -46,7 +52,7 @@ function nextScenarioId() {
 
 const SITE_LABELS = ["Site A", "Site B", "Site C", "Site D", "Site E", "Site F"];
 
-export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "lng" | "lat" | "createdAt"> = {
+export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "stateId" | "lng" | "lat" | "createdAt"> = {
   mwLoad: 100,
   buildings: 3,
   coolingTechnology: "cooling_tower_evaporative" as CoolingTechnology,
@@ -56,10 +62,10 @@ export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "l
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
-  activeStateId: "washington",
-  setActiveStateId: (id) => set({ activeStateId: id }),
+  activeStateId: DEFAULT_STATE_ID,
+  setActiveStateId: (id) => set({ activeStateId: id, layerVisibility: defaultLayerVisibility(id) }),
 
-  layerVisibility: Object.fromEntries(WASHINGTON.layers.map((l) => [l.id, Boolean(l.defaultVisible)])),
+  layerVisibility: defaultLayerVisibility(DEFAULT_STATE_ID),
   toggleLayer: (id) =>
     set((s) => ({ layerVisibility: { ...s.layerVisibility, [id]: !s.layerVisibility[id] } })),
 
@@ -76,6 +82,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const scenario: ScenarioConfig = {
       id,
       label: SITE_LABELS[idx] ?? `Site ${idx + 1}`,
+      stateId: get().activeStateId,
       lng,
       lat,
       createdAt: new Date().toISOString(),

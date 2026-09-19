@@ -1,6 +1,7 @@
 import type { RegulationAnalysis, ScenarioConfig } from "@/lib/types";
 import { cached, TTL } from "@/lib/cache/memoryCache";
-import { WA_SOURCES } from "@/states/washington/sources";
+import { getStateGisBundle } from "@/lib/gis/stateGis";
+import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -30,6 +31,7 @@ export async function computeRegulationAnalysis(
   scenario: ScenarioConfig,
   utilityTerritoryName: string | null
 ): Promise<RegulationAnalysis> {
+  const bundle = getStateGisBundle(scenario.stateId);
   const county = await reverseGeocodeCounty(scenario.lng, scenario.lat);
 
   return {
@@ -37,30 +39,19 @@ export async function computeRegulationAnalysis(
       label: "Utility service territory",
       value: utilityTerritoryName,
       confidence: utilityTerritoryName ? "proxy" : "unknown",
-      source: WA_SOURCES.waUtilityTerritories,
+      source: bundle.utilityTerritorySource,
     },
     county: {
       label: "County",
       value: county,
       confidence: county ? "fact" : "unknown",
-      source: {
-        id: "census-geocoder",
-        name: "US Census Bureau Geocoder",
-        url: "https://geocoding.geo.census.gov/geocoder/",
-        methodology: "Reverse point-in-polygon lookup against current county boundaries.",
-      },
+      source: NATIONAL_SOURCES.censusGeocoder,
     },
     permittingNote: {
       label: "General permitting context",
-      value:
-        "Large facilities in Washington typically trigger county conditional-use/site-plan review and, depending on size and location, State Environmental Policy Act (SEPA) review. Utility interconnection is a separate process from land-use permitting.",
+      value: bundle.permittingNote.text,
       confidence: "estimated",
-      source: {
-        id: "wa-sepa-general",
-        name: "Washington State Environmental Policy Act (general reference)",
-        url: "https://ecology.wa.gov/regulations-permits/sepa",
-        methodology: "General regulatory context, not a jurisdiction-specific legal determination.",
-      },
+      source: bundle.permittingNote.source,
       caveats: ["This is general context, not legal or permitting advice — requirements vary by county and project."],
     },
   };
