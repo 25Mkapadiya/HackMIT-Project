@@ -4,7 +4,7 @@ import { useState } from "react";
 import DraggablePanel from "@/components/ui/DraggablePanel";
 import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 import { useAppStore } from "@/store/useAppStore";
-import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
+import { getState, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
 import type { LayerCategory } from "@/lib/types";
 
 const CATEGORY_META: Record<LayerCategory, { label: string; color: string }> = {
@@ -58,7 +58,7 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
   const activeLayers = showAllStates
     ? Array.from(
         new Map(
-          getEnabledStates()
+          getShowAllStates()
             .flatMap((state) => state.layers)
             .map((layer) => [layer.id, layer] as const)
         ).values()

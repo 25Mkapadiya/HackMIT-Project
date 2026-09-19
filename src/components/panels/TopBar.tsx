@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { STATE_REGISTRY, getState, getEnabledStates } from "@/states/registry";
+import { STATE_REGISTRY, getState, getShowAllStates } from "@/states/registry";
 
 export default function TopBar() {
   const proposeMode = useAppStore((s) => s.proposeMode);
@@ -19,7 +19,7 @@ export default function TopBar() {
   const stateSearchRef = useRef<HTMLDivElement>(null);
 
   const activeState = getState(activeStateId);
-  const implementedStates = getEnabledStates();
+  const implementedStates = getShowAllStates();
   const subtitle = showAllStates
     ? `Showing all ${implementedStates.length} implemented states`
     : activeState?.enabled
@@ -63,7 +63,7 @@ export default function TopBar() {
             G
           </div>
           <div className="leading-tight">
-            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">GEO: Geographical Energy Outcomes</div>
+            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">GEO: Graphical Energy Outcomes</div>
             <div className="text-[9.5px] text-ink-500 tracking-wide -mt-0.5 truncate max-w-[240px]">{subtitle}</div>
           </div>
         </div>
