@@ -15,7 +15,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GEO: Geographical Energy Outcomes",
+  title: "GEO: Graphical Energy Outcomes",
   description:
     "Interactive infrastructure siting and impact analysis for hypothetical data center facilities, starting with Washington State.",
 };
