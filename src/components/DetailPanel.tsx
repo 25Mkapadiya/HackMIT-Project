@@ -3,6 +3,8 @@ import type { CountyScore } from "../lib/types";
 interface Props {
   score: CountyScore | null;
   stateHasCustomRules: boolean;
+  isPlaced: boolean;
+  onPlace: () => void;
 }
 
 const FACTOR_LABELS: Record<keyof CountyScore["breakdown"], string> = {
@@ -12,7 +14,7 @@ const FACTOR_LABELS: Record<keyof CountyScore["breakdown"], string> = {
   demand: "Demand headroom",
 };
 
-export default function DetailPanel({ score, stateHasCustomRules }: Props) {
+export default function DetailPanel({ score, stateHasCustomRules, isPlaced, onPlace }: Props) {
   return (
     <div className="panel" id="tilePanel">
       <div className="panel-title">Selected county</div>
@@ -70,6 +72,18 @@ export default function DetailPanel({ score, stateHasCustomRules }: Props) {
               demand headroom only.
             </p>
           )}
+
+          <button
+            className="btn btn-primary"
+            onClick={onPlace}
+            disabled={score.blocked || isPlaced}
+          >
+            {score.blocked
+              ? "Can't place — protected zone"
+              : isPlaced
+              ? "Placed"
+              : "Place datacenter here"}
+          </button>
         </div>
       )}
     </div>

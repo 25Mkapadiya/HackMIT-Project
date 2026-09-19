@@ -29,6 +29,7 @@ export interface GridHub {
 }
 
 export type Interconnect = "grid-tied" | "self-generated";
+export type Cooling = "air" | "evaporative" | "liquid";
 
 export interface Weights {
   grid: number;
@@ -40,7 +41,26 @@ export interface Weights {
 export interface ScenarioInputs {
   loadMW: number;
   interconnect: Interconnect;
+  cooling: Cooling;
   weights: Weights;
+}
+
+export interface Placement {
+  id: string;
+  stateFips: string;
+  countyFips: string;
+  countyName: string;
+  loadMW: number;
+  interconnect: Interconnect;
+  cooling: Cooling;
+  score: number;
+  tier: Tier;
+}
+
+export interface StateMeters {
+  headroom: number;
+  water: number;
+  approval: number;
 }
 
 export type Tier = "good" | "caution" | "major" | "bad";

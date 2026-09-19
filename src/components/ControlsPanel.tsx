@@ -1,4 +1,5 @@
-import type { Interconnect, ScenarioInputs, Weights } from "../lib/types";
+import type { Cooling, Interconnect, ScenarioInputs, Weights } from "../lib/types";
+import { coolingLabel } from "../lib/simulation";
 
 interface Props {
   inputs: ScenarioInputs;
@@ -19,6 +20,7 @@ export default function ControlsPanel({ inputs, onChange }: Props) {
   const setLoad = (value: number) => onChange({ ...inputs, loadMW: value });
   const setInterconnect = (value: Interconnect) =>
     onChange({ ...inputs, interconnect: value });
+  const setCooling = (value: Cooling) => onChange({ ...inputs, cooling: value });
 
   return (
     <div className="panel">
@@ -61,6 +63,20 @@ export default function ControlsPanel({ inputs, onChange }: Props) {
               onClick={() => setInterconnect(opt)}
             >
               {opt === "grid-tied" ? "Grid-tied" : "Self-generated"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="field">
+        <label>Cooling</label>
+        <div className="toggle-row">
+          {(["air", "evaporative", "liquid"] as Cooling[]).map((opt) => (
+            <button
+              key={opt}
+              className={"toggle-opt" + (inputs.cooling === opt ? " selected" : "")}
+              onClick={() => setCooling(opt)}
+            >
+              {coolingLabel(opt)}
             </button>
           ))}
         </div>

@@ -11,6 +11,7 @@ interface Props {
   scores: Map<string, CountyScore>;
   selectedFips: string | null;
   hoveredFips: string | null;
+  placedFips: Set<string>;
   onHover: (fips: string | null) => void;
   onSelect: (fips: string) => void;
 }
@@ -20,6 +21,7 @@ export default function StateMap({
   scores,
   selectedFips,
   hoveredFips,
+  placedFips,
   onHover,
   onSelect,
 }: Props) {
@@ -74,6 +76,22 @@ export default function StateMap({
               {s ? (s.blocked ? " — blocked" : ` — score ${s.score} (${s.tier.label})`) : ""}
             </title>
           </path>
+        );
+      })}
+      {counties.features.map((f) => {
+        const fips = f.properties.fips;
+        if (!placedFips.has(fips)) return null;
+        const centroid = path.centroid(f);
+        if (centroid.some((n) => Number.isNaN(n))) return null;
+        return (
+          <g
+            key={`placed-${fips}`}
+            className="placed-marker"
+            transform={`translate(${centroid[0]}, ${centroid[1]})`}
+          >
+            <circle r={7} />
+            <text dy="0.5">✓</text>
+          </g>
         );
       })}
     </svg>

@@ -6,13 +6,15 @@ import {
   scoreFromFactors,
 } from "./lib/scoring";
 import type { CountyFactors } from "./lib/scoring";
-import type { CountyScore, ScenarioInputs } from "./lib/types";
+import { metersForState } from "./lib/simulation";
+import type { CountyScore, Placement, ScenarioInputs } from "./lib/types";
 import stateNotes from "./data/state-notes.json";
 import USMap from "./components/USMap";
 import StateMap from "./components/StateMap";
 import ControlsPanel from "./components/ControlsPanel";
 import DetailPanel from "./components/DetailPanel";
 import TopList from "./components/TopList";
+import StateResourcesPanel from "./components/StateResourcesPanel";
 import Legend from "./components/Legend";
 
 export default function App() {
@@ -21,6 +23,7 @@ export default function App() {
   const [inputs, setInputs] = useState<ScenarioInputs>({
     loadMW: 150,
     interconnect: "grid-tied",
+    cooling: "air",
     weights: DEFAULT_WEIGHTS,
   });
 
@@ -29,6 +32,7 @@ export default function App() {
   const [hoveredStateFips, setHoveredStateFips] = useState<string | null>(null);
   const [selectedCountyFips, setSelectedCountyFips] = useState<string | null>(null);
   const [hoveredCountyFips, setHoveredCountyFips] = useState<string | null>(null);
+  const [placements, setPlacements] = useState<Placement[]>([]);
 
   // Geography-derived factors, computed once per county when data loads —
   // independent of the scenario weights so slider drags stay cheap.
@@ -100,6 +104,28 @@ export default function App() {
     );
   }, [data, selectedStateFips]);
 
+  const placementsInState = useMemo(
+    () => placements.filter((p) => p.stateFips === selectedStateFips),
+    [placements, selectedStateFips]
+  );
+  const placedFipsInState = useMemo(
+    () => new Set(placementsInState.map((p) => p.countyFips)),
+    [placementsInState]
+  );
+
+  const stateMeters = useMemo(() => {
+    if (!selectedStateFips) return null;
+    return metersForState(
+      selectedStatePostal,
+      stateAvgScore.get(selectedStateFips) ?? 50,
+      placementsInState
+    );
+  }, [selectedStateFips, selectedStatePostal, stateAvgScore, placementsInState]);
+
+  const isSelectedCountyPlaced = selectedCountyFips
+    ? placedFipsInState.has(selectedCountyFips)
+    : false;
+
   function handleSelectState(fips: string, postal: string | null) {
     setSelectedStateFips(fips);
     setSelectedStatePostal(postal);
@@ -110,6 +136,51 @@ export default function App() {
     setSelectedStateFips(null);
     setSelectedStatePostal(null);
     setSelectedCountyFips(null);
+  }
+
+  function handlePlace() {
+    if (!selectedStateFips || !selectedCountyFips || !selectedCountyScore) return;
+    if (selectedCountyScore.blocked || isSelectedCountyPlaced) return;
+    const placement: Placement = {
+      id: `${selectedCountyFips}-${Date.now()}`,
+      stateFips: selectedStateFips,
+      countyFips: selectedCountyFips,
+      countyName: selectedCountyScore.name,
+      loadMW: inputs.loadMW,
+      interconnect: inputs.interconnect,
+      cooling: inputs.cooling,
+      score: selectedCountyScore.score,
+      tier: selectedCountyScore.tier.cls,
+    };
+    setPlacements((prev) => [...prev, placement]);
+  }
+
+  function handleResetState() {
+    setPlacements((prev) => prev.filter((p) => p.stateFips !== selectedStateFips));
+  }
+
+  function handleDemo(kind: "good" | "bad") {
+    let pick: CountyScore | undefined;
+    if (kind === "good") {
+      pick = scoresInState
+        .filter((s) => !s.blocked)
+        .reduce<CountyScore | undefined>(
+          (best, s) => (!best || s.score > best.score ? s : best),
+          undefined
+        );
+    } else {
+      const blocked = scoresInState.filter((s) => s.blocked);
+      pick = blocked[0] ??
+        scoresInState
+          .filter((s) => !s.blocked)
+          .reduce<CountyScore | undefined>(
+            (worst, s) => (!worst || s.score < worst.score ? s : worst),
+            undefined
+          );
+    }
+    if (!pick) return;
+    handleResetState();
+    setSelectedCountyFips(pick.fips);
   }
 
   if (error) {
@@ -148,6 +219,7 @@ export default function App() {
                 scores={scoresByFips}
                 selectedFips={selectedCountyFips}
                 hoveredFips={hoveredCountyFips}
+                placedFips={placedFipsInState}
                 onHover={setHoveredCountyFips}
                 onSelect={setSelectedCountyFips}
               />
@@ -173,7 +245,22 @@ export default function App() {
 
         <div className="side-col">
           <ControlsPanel inputs={inputs} onChange={setInputs} />
-          <DetailPanel score={selectedCountyScore} stateHasCustomRules={stateHasCustomRules} />
+          <DetailPanel
+            score={selectedCountyScore}
+            stateHasCustomRules={stateHasCustomRules}
+            isPlaced={isSelectedCountyPlaced}
+            onPlace={handlePlace}
+          />
+          {selectedStateFips && stateMeters && (
+            <StateResourcesPanel
+              stateName={selectedStateName ?? "Selected state"}
+              meters={stateMeters}
+              placedCount={placementsInState.length}
+              onReset={handleResetState}
+              onDemoGood={() => handleDemo("good")}
+              onDemoBad={() => handleDemo("bad")}
+            />
+          )}
           {selectedStateFips && (
             <TopList
               scores={scoresInState}

@@ -7,8 +7,22 @@ proximity, carbon intensity, land availability, demand headroom).
 
 This started from a Texas-only schematic-grid demo
 ([25Mkapadiya/Datacenter-Simulation](https://github.com/25Mkapadiya/Datacenter-Simulation))
-that stood in for real geography with a 12×9 grid. This version replaces
-that grid with real county boundaries and a nationwide scoring engine.
+that stood in for real geography with a 12×9 grid and simulated placing a
+facility against three statewide resource meters. This version keeps that
+placement simulation but drops the schematic grid for real county
+boundaries and a nationwide scoring engine — pick any state, not just Texas.
+
+## Placing a facility
+
+Pick a load size, interconnection type, and cooling method, then click
+"Place datacenter here" on a selected county. That draws down three
+per-state meters (grid headroom, water reserve, community approval) using
+the same cooling/interconnect trade-off formula as the original demo,
+scaled to whatever state you're in. Placed counties get a checkmark on the
+map; "Reset" clears every placement in the current state back to baseline;
+"Demo: good placement" / "Demo: bad placement" jump to the current state's
+best-scoring county and its worst (a blocked county if one exists, else its
+lowest-scoring buildable county).
 
 ## Run it
 
@@ -93,6 +107,13 @@ when they apply):
   explicitly. Extending `state-notes.json` with another state's real rules
   (statute, local pauses, protected zones) is the same shape as the Texas
   entry.
+- **Simulation resource meters** (`src/lib/simulation.ts`) — grid headroom
+  is derived from this app's own composite score (not a real ISO/utility
+  feed), water reserve starts from `src/data/water-stress.json`'s
+  approximate, illustrative state ranking, and community approval is a
+  deterministic per-state placeholder. The cooling/interconnect drain
+  formula itself is carried over unchanged from the original demo's
+  `placeDatacenter()`.
 
 ## Wiring in the real data layer
 
@@ -122,9 +143,10 @@ a demo.
 data/raw/                 committed source TopoJSON (Census TIGER/Line via us-atlas)
 scripts/build-data.mjs    offline preprocessing: TopoJSON -> flat GeoJSON in public/data
 public/data/              generated us-states.json / us-counties.json (npm run prep-data)
-src/data/                 curated reference JSON: grid hubs, carbon intensity, state notes
+src/data/                 curated reference JSON: grid hubs, carbon intensity, water stress, state notes
 src/lib/scoring.ts        turf-based scoring engine
+src/lib/simulation.ts     placement drain formula + per-state resource meter baselines
 src/lib/useGeoData.ts     fetches the generated GeoJSON at runtime
-src/components/           USMap, StateMap, ControlsPanel, DetailPanel, TopList, Legend
+src/components/           USMap, StateMap, ControlsPanel, DetailPanel, StateResourcesPanel, TopList, Legend
 src/App.tsx               state management + layout
 ```
