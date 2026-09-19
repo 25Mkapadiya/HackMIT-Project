@@ -47,6 +47,10 @@ export default function MapView() {
   const hawaiiMapRef = useRef<maplibregl.Map | null>(null);
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
+  const preloadedLayerDataRef = useRef<Map<string, FeatureCollection>>(new Map());
+  const preloadPromiseRef = useRef<Promise<void> | null>(null);
+  const showAllAnimationRunRef = useRef(0);
+  const lastShowAllAnimationKeyRef = useRef("");
   // Layer ids (e.g. "transmission-lines") are stable across states even though
   // the underlying source is swapped out on state switch (see the teardown
   // logic below) — click/hover handlers are bound to that stable layer id
@@ -72,6 +76,50 @@ export default function MapView() {
   // that produces the value it seeds).
   const activeStateIdRef = useRef(activeStateId);
   const showAllStatesRef = useRef(showAllStates);
+
+  // ---- preload implemented-state GIS data (once) ----
+  // Start network work immediately on mount, before the map is ready. This keeps
+  // "Show All" responsive: switching views reuses in-memory GeoJSON instead of
+  // waiting on dozens of state GIS requests.
+  useEffect(() => {
+    if (preloadPromiseRef.current) return;
+
+    const states = getEnabledStates();
+    const tasks: Array<() => Promise<void>> = [];
+
+    for (const state of states) {
+      const bboxParam = stateBboxParam(state.id);
+      for (const layer of state.layers) {
+        if (layer.geometryType === "raster") continue;
+
+        const key = `${state.id}:${layer.id}`;
+        tasks.push(async () => {
+          try {
+            const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
+            if (!res.ok) throw new Error(`request failed (${res.status})`);
+            const data = (await res.json()) as FeatureCollection;
+            preloadedLayerDataRef.current.set(key, data);
+          } catch (err) {
+            // Keep the app usable even if one upstream GIS source is temporarily
+            // unavailable; the normal sync path can retry that layer on demand.
+            console.warn(`Preload failed for ${state.name} layer ${layer.id}`, err);
+          }
+        });
+      }
+    }
+
+    preloadPromiseRef.current = (async () => {
+      const workerCount = Math.min(8, tasks.length);
+      let nextTask = 0;
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (nextTask < tasks.length) {
+          const task = tasks[nextTask++];
+          if (task) await task();
+        }
+      });
+      await Promise.all(workers);
+    })();
+  }, []);
 
   // ---- init map (once) ----
   useEffect(() => {
@@ -136,8 +184,7 @@ export default function MapView() {
         paint: {
           "circle-radius": 16,
           "circle-color": "#ff5470",
-          "circle-opacity": 0.16,
-          "circle-blur": 0.4,
+          "circle-opacity": 0.16,          "circle-blur": 0.4,
         },
       });
       map.addLayer({
@@ -317,8 +364,7 @@ export default function MapView() {
               "<strong>State not implemented yet</strong><br/>Choose a location inside one of the states currently included in Show All."
             )
             .addTo(map);
-          return;
-        }
+          return;        }
 
         targetStateId = targetState.id;
       }
@@ -348,9 +394,9 @@ export default function MapView() {
   }, [mapReady, activeStateId, showAllStates]);
 
   // ---- load/toggle infrastructure layers ----
-  // Every source + rendered MapLibre layer is state-prefixed, so "Show All" can
-  // display the same logical layer (e.g. transmission-lines) for many states
-  // simultaneously without id collisions.
+  // State GeoJSON is prefetched into memory on mount. Sources/layers are added
+  // from that cache, and Show All reveals states diagonally from northwest to
+  // southeast instead of waiting for a state-by-state network waterfall.
   const lastSyncedViewKey = useRef("");
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -364,91 +410,135 @@ export default function MapView() {
       : `state:${activeStateId}`;
     lastSyncedViewKey.current = viewKey;
 
-    // Remove data belonging to states that are no longer part of this view.
+    // Keep previously loaded state sources resident so returning to Show All is
+    // instant. States outside the current view are hidden, not removed.
     for (const key of Array.from(loadedLayerIds.current)) {
       const [stateId, layerId] = key.split(":");
       if (!stateId || !layerId || wantedStateIds.has(stateId)) continue;
       const previousState = getState(stateId);
       const previousLayer = previousState?.layers.find((layer) => layer.id === layerId);
+      if (!previousLayer) continue;
       const sourceId = `src-${stateId}-${layerId}`;
-      if (previousLayer) {
-        for (const spec of buildLayerSpecs(previousLayer, sourceId, stateId)) {
-          if (map.getLayer(spec.id)) map.removeLayer(spec.id);
-        }
+      for (const spec of buildLayerSpecs(previousLayer, sourceId, stateId)) {
+        if (map.getLayer(spec.id)) map.setLayoutProperty(spec.id, "visibility", "none");
       }
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
-      loadedLayerIds.current.delete(key);
-      loadingLayerIds.current.delete(key);
+    }
+
+    async function ensureLayer(state: ReturnType<typeof getEnabledStates>[number], layer: LayerDefinition) {
+      const key = `${state.id}:${layer.id}`;
+      const sourceId = `src-${state.id}-${layer.id}`;
+      if (loadedLayerIds.current.has(key) || loadingLayerIds.current.has(key)) return;
+
+      loadingLayerIds.current.add(key);
+      try {
+        let data = preloadedLayerDataRef.current.get(key);
+        if (!data) {
+          const bboxParam = stateBboxParam(state.id);
+          const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
+          if (!res.ok) throw new Error(`request failed (${res.status})`);
+          data = (await res.json()) as FeatureCollection;
+          preloadedLayerDataRef.current.set(key, data);
+        }
+
+        if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
+
+        if (!map.getSource(sourceId)) {
+          map.addSource(sourceId, { type: "geojson", data });
+          const specs = buildLayerSpecs(layer, sourceId, state.id);
+          for (const spec of specs) {
+            if (!map.getLayer(spec.id)) {
+              map.addLayer(spec);
+              map.setLayoutProperty(spec.id, "visibility", "none");
+            }
+          }
+
+          const interactionKey = `${state.id}:${layer.id}`;
+          if (!interactivityAttached.current.has(interactionKey)) {
+            attachInteractivity(map, layer, popupRef, state.id);
+            interactivityAttached.current.add(interactionKey);
+          }
+        }
+
+        loadedLayerIds.current.add(key);
+      } catch (err) {
+        console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
+      } finally {
+        loadingLayerIds.current.delete(key);
+      }
     }
 
     async function syncLayers() {
-      const tasks: Array<() => Promise<void>> = [];
+      const tasks: Array<Promise<void>> = [];
 
       for (const state of states) {
-        const bboxParam = stateBboxParam(state.id);
         for (const layer of state.layers) {
           if (layer.geometryType === "raster") continue;
-
-          const key = `${state.id}:${layer.id}`;
           const wantVisible = Boolean(layerVisibility[layer.id]);
-          const sourceId = `src-${state.id}-${layer.id}`;
+          const key = `${state.id}:${layer.id}`;
 
-          if (loadedLayerIds.current.has(key)) {
-            const specs = buildLayerSpecs(layer, sourceId, state.id);
-            for (const spec of specs) {
-              if (map.getLayer(spec.id)) {
-                map.setLayoutProperty(spec.id, "visibility", wantVisible ? "visible" : "none");
-              }
-            }
-            continue;
+          if (!loadedLayerIds.current.has(key) && wantVisible) {
+            tasks.push(ensureLayer(state, layer));
           }
-
-          if (!wantVisible || loadingLayerIds.current.has(key)) continue;
-
-          tasks.push(async () => {
-            loadingLayerIds.current.add(key);
-            try {
-              const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
-              const data = (await res.json()) as FeatureCollection;
-              if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
-
-              if (!map.getSource(sourceId)) {
-                map.addSource(sourceId, { type: "geojson", data });
-                const specs = buildLayerSpecs(layer, sourceId, state.id);
-                for (const spec of specs) {
-                  if (!map.getLayer(spec.id)) map.addLayer(spec);
-                }
-
-                const interactionKey = `${state.id}:${layer.id}`;
-                if (!interactivityAttached.current.has(interactionKey)) {
-                  attachInteractivity(map, layer, popupRef, state.id);
-                  interactivityAttached.current.add(interactionKey);
-                }
-              }
-
-              loadedLayerIds.current.add(key);
-            } catch (err) {
-              console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
-            } finally {
-              loadingLayerIds.current.delete(key);
-            }
-          });
         }
       }
 
-      // Avoid a state-by-state waterfall while still limiting pressure on public GIS APIs.
-      const workerCount = Math.min(showAllStates ? 6 : 4, tasks.length);
-      let nextTask = 0;
-      const workers = Array.from({ length: workerCount }, async () => {
-        while (nextTask < tasks.length) {
-          const task = tasks[nextTask++];
-          if (task) await task();
+      await Promise.all(tasks);
+      if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
+
+      const setStateVisibility = (state: (typeof states)[number], visible: boolean) => {
+        for (const layer of state.layers) {
+          if (layer.geometryType === "raster") continue;
+          const sourceId = `src-${state.id}-${layer.id}`;
+          for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+            if (map.getLayer(spec.id)) {
+              const shouldShow = visible && Boolean(layerVisibility[layer.id]);
+              map.setLayoutProperty(spec.id, "visibility", shouldShow ? "visible" : "none");
+            }
+          }
         }
+      };
+
+      if (!showAllStates) {
+        showAllAnimationRunRef.current += 1;
+        lastShowAllAnimationKeyRef.current = "";
+        setStateVisibility(states[0], true);
+        return;
+      }
+
+      const animationKey = viewKey;
+      const shouldAnimate = lastShowAllAnimationKeyRef.current !== animationKey;
+      if (!shouldAnimate) {
+        for (const state of states) setStateVisibility(state, true);
+        return;
+      }
+
+      lastShowAllAnimationKeyRef.current = animationKey;
+      const runId = ++showAllAnimationRunRef.current;
+
+      // Order by a northwest -> southeast diagonal score using state centers.
+      const orderedStates = [...states].sort((a, b) => {
+        const scoreA = (a.center[0] + 180) + (90 - a.center[1]) * 1.35;
+        const scoreB = (b.center[0] + 180) + (90 - b.center[1]) * 1.35;
+        return scoreA - scoreB;
       });
-      await Promise.all(workers);
+
+      for (const state of states) setStateVisibility(state, false);
+
+      orderedStates.forEach((state, index) => {
+        window.setTimeout(() => {
+          if (
+            showAllAnimationRunRef.current !== runId ||
+            lastSyncedViewKey.current !== viewKey ||
+            !showAllStatesRef.current
+          ) {
+            return;
+          }
+          setStateVisibility(state, true);
+        }, index * 95);
+      });
     }
 
-    syncLayers();
+    void syncLayers();
   }, [mapReady, activeStateId, showAllStates, layerVisibility]);
 
   // ---- U.S. visual forest cover ----
@@ -517,8 +607,7 @@ export default function MapView() {
         tiles: [
           "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}",
         ],
-        tileSize: 256,
-        minzoom: 4,
+        tileSize: 256,        minzoom: 4,
         maxzoom: 14,
         bounds: [-179.9, 15, -63, 72],
         attribution: "Shaded relief © USGS The National Map / 3DEP",
@@ -697,8 +786,7 @@ function spiralFocusOnSite(
     map.easeTo({
       center: [site.lng, site.lat],
       zoom: finalZoom,
-      bearing: startBearing + 320,
-      pitch: 52,
+      bearing: startBearing + 320,      pitch: 52,
       duration: 1250,
       offset: [0, 36],
       easing: (t) => 1 - Math.pow(1 - t, 3),
