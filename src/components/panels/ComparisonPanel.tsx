@@ -41,6 +41,10 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
       },
       { label: "Utility territory", get: (a) => ({ value: a.power.utilityTerritory.value, confidence: a.power.utilityTerritory.confidence }) },
       {
+        label: "Large-load contact",
+        get: (a) => ({ value: a.regulation.utilityLargeLoadContact.value, confidence: a.regulation.utilityLargeLoadContact.confidence }),
+      },
+      {
         label: "Nearby generation",
         get: (a) => ({
           value: a.power.nearbyGeneration.value ? `${Math.round(a.power.nearbyGeneration.value.totalMw)} MW` : null,
@@ -104,6 +108,13 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
         }),
       },
       { label: "County", get: (a) => ({ value: a.regulation.county.value, confidence: a.regulation.county.confidence }) },
+      {
+        label: "HIGH-rated hazards",
+        get: (a) => ({
+          value: a.land.naturalHazards.value.filter((h) => h.endsWith("HIGH")).length,
+          confidence: a.land.naturalHazards.confidence,
+        }),
+      },
     ],
   },
   {
@@ -111,6 +122,10 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
     color: "#c9d3e0",
     rows: [
       { label: "Est. acreage", get: (a) => ({ value: `${a.development.acreage.value} ac`, confidence: a.development.acreage.confidence }) },
+      {
+        label: "Potential incentives",
+        get: (a) => ({ value: a.development.potentialIncentives.value.length, confidence: a.development.potentialIncentives.confidence }),
+      },
       { label: "Infra. gaps flagged", get: (a) => ({ value: a.gaps.length, confidence: "fact" }) },
     ],
   },

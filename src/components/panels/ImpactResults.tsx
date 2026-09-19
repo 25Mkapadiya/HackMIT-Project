@@ -73,6 +73,7 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
       <Section title="Regulation" color="#f2703b">
         <MetricRow metric={regulation.county} />
         <MetricRow metric={regulation.permittingNote} />
+        <MetricRow metric={regulation.utilityLargeLoadContact} />
       </Section>
 
       <Section title="Environment / Land" color="#3bf2a0">
@@ -81,12 +82,14 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
         <MetricRow metric={land.nearestMajorRoadMiles} />
         <MetricRow metric={land.populationWithin5mi} />
         <MetricRow metric={{ ...land.environmentalConstraints, value: land.environmentalConstraints.value.join(" ") }} />
+        <MetricRow metric={{ ...land.naturalHazards, value: land.naturalHazards.value.join(", ") || "Unavailable" }} />
       </Section>
 
       <Section title="Development" color="#c9d3e0">
         <MetricRow metric={development.acreage} />
         <MetricRow metric={development.constructionCostUsd} />
         <MetricRow metric={development.timelineYears} />
+        <MetricRow metric={{ ...development.potentialIncentives, value: development.potentialIncentives.value.join("; ") || "None catalogued" }} />
       </Section>
 
       <div className="mb-1">

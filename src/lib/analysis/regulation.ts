@@ -1,6 +1,7 @@
 import type { RegulationAnalysis, ScenarioConfig } from "@/lib/types";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 import { WA_SOURCES } from "@/states/washington/sources";
+import { getWaUtilities, matchUtility } from "@/lib/supabase/queries";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -30,7 +31,11 @@ export async function computeRegulationAnalysis(
   scenario: ScenarioConfig,
   utilityTerritoryName: string | null
 ): Promise<RegulationAnalysis> {
-  const county = await reverseGeocodeCounty(scenario.lng, scenario.lat);
+  const [county, utilities] = await Promise.all([
+    reverseGeocodeCounty(scenario.lng, scenario.lat),
+    getWaUtilities(),
+  ]);
+  const utility = matchUtility(utilityTerritoryName, utilities);
 
   return {
     utilityTerritory: {
@@ -62,6 +67,22 @@ export async function computeRegulationAnalysis(
         methodology: "General regulatory context, not a jurisdiction-specific legal determination.",
       },
       caveats: ["This is general context, not legal or permitting advice — requirements vary by county and project."],
+    },
+    utilityLargeLoadContact: {
+      label: "Large-load interconnection contact",
+      value: utility ? utility.large_load_process_url ?? utility.website ?? utility.name : null,
+      confidence: utility ? "fact" : "unknown",
+      source: {
+        id: "curated-wa-utilities",
+        name: "Curated WA utility directory (large-load process & contacts)",
+        url: "",
+        methodology: "Utility resolved by matching the ArcGIS service-territory name to a hand-curated utility record.",
+      },
+      caveats: utility
+        ? [utility.large_load_notes, utility.large_load_contact ? `Contact: ${utility.large_load_contact}` : null].filter(
+            (c): c is string => Boolean(c)
+          )
+        : ["Utility could not be matched from the resolved service-territory name — verify service territory manually."],
     },
   };
 }

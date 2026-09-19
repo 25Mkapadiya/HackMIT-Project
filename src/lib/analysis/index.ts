@@ -22,7 +22,7 @@ export async function runScenarioAnalysis(scenario: ScenarioConfig): Promise<Sce
   const water = await computeWaterAnalysis(scenario);
   const land = await computeLandAnalysis(scenario);
 
-  const development = computeDevelopmentEstimate(scenario, land);
+  const development = await computeDevelopmentEstimate(scenario, land);
   const gaps = synthesizeGaps(power, fiber, regulation, water, land);
 
   return {

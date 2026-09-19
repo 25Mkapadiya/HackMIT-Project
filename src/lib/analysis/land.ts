@@ -6,6 +6,7 @@ import { bboxAroundMiles, milesBetween, nearestFeatureWhere, polygonContaining }
 import { WA_SOURCES } from "@/states/washington/sources";
 import { ACREAGE_PER_MW, POPULATION_RADIUS_MI } from "@/lib/constants/assumptions";
 import { cached, TTL } from "@/lib/cache/memoryCache";
+import { getWaHazards } from "@/lib/supabase/queries";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -118,11 +119,12 @@ export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<Lan
   const roadBbox = bboxAroundMiles(lng, lat, 15);
   const tractBbox = bboxAroundMiles(lng, lat, POPULATION_RADIUS_MI + 2);
 
-  const [floodFc, roadsFc, tractsFc, elevationFt] = await Promise.all([
+  const [floodFc, roadsFc, tractsFc, elevationFt, hazards] = await Promise.all([
     WA_LAYER_FETCHERS["flood-zones"]!(floodBbox) as Promise<FeatureCollection<Geometry, FloodProps>>,
     WA_LAYER_FETCHERS["state-highways"]!(roadBbox) as Promise<FeatureCollection<Geometry, RoadProps>>,
     WA_LAYER_FETCHERS["population-tracts"]!(tractBbox) as Promise<FeatureCollection<Geometry, TractProps>>,
     getElevationFt(lng, lat),
+    getWaHazards(),
   ]);
 
   const floodZone = polygonContaining(lng, lat, floodFc);
@@ -197,5 +199,28 @@ export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<Lan
         methodology: `${ACREAGE_PER_MW.typical} acres/MW (typical) × ${mwLoad} MW IT load.`,
       },
     },
+    naturalHazards: {
+      label: "Statewide natural hazard exposure",
+      value: hazards
+        .filter((h) => h.risk_level !== "negligible" && h.risk_level !== "not_applicable")
+        .sort((a, b) => HAZARD_SEVERITY_ORDER.indexOf(a.risk_level) - HAZARD_SEVERITY_ORDER.indexOf(b.risk_level))
+        .map((h) => `${titleCase(h.hazard_type)} — ${h.risk_level.toUpperCase()}`),
+      confidence: hazards.length > 0 ? "fact" : "unknown",
+      source: {
+        id: "curated-wa-hazards",
+        name: "Curated WA natural hazard assessment",
+        url: "",
+        methodology: "State-level hazard list, not resolved to this specific coordinate (e.g. lahar zones are valley-specific and require a site-level check).",
+      },
+      caveats: [
+        "Statewide baseline, not site-specific — a formal geotechnical/seismic and lahar-zone study is required before design.",
+      ],
+    },
   };
+}
+
+const HAZARD_SEVERITY_ORDER = ["high", "moderate", "low"];
+
+function titleCase(s: string): string {
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

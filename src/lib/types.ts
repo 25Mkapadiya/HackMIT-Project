@@ -126,6 +126,7 @@ export interface RegulationAnalysis {
   utilityTerritory: Metric<string | null>;
   county: Metric<string | null>;
   permittingNote: Metric<string>;
+  utilityLargeLoadContact: Metric<string | null>;
 }
 
 export interface WaterAnalysis {
@@ -145,12 +146,14 @@ export interface LandAnalysis {
   populationWithin5mi: Metric<number | null>;
   environmentalConstraints: Metric<string[]>;
   estimatedAcreage: Metric<number>;
+  naturalHazards: Metric<string[]>;
 }
 
 export interface DevelopmentEstimate {
   acreage: Metric<number>;
   constructionCostUsd: Metric<[number, number]>;
   timelineYears: Metric<[number, number]>;
+  potentialIncentives: Metric<string[]>;
 }
 
 export interface InfrastructureGap {

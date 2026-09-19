@@ -115,5 +115,15 @@ export function synthesizeGaps(
     });
   }
 
+  const highHazards = land.naturalHazards.value.filter((h) => h.endsWith("HIGH"));
+  if (highHazards.length > 0) {
+    gaps.push({
+      category: "land",
+      severity: "watch",
+      summary: `${highHazards.length} statewide hazard(s) rated HIGH for Washington.`,
+      detail: `${highHazards.join(", ")}. Confirm seismic design category and wildfire/smoke-intake mitigation requirements during design — this is a statewide baseline, not a site-specific study.`,
+    });
+  }
+
   return gaps;
 }
