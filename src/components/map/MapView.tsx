@@ -9,7 +9,7 @@ import { getWaLayer } from "@/states/washington/layers";
 import { getState } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
-import { BASEMAP_STYLE, emptyFeatureCollection } from "./mapStyle";
+import { BASEMAP_STYLE, US_MAX_BOUNDS, US_MIN_ZOOM, emptyFeatureCollection } from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
 import { buildPopupHtml } from "./popupContent";
 
@@ -46,10 +46,16 @@ export default function MapView() {
       zoom: WASHINGTON.defaultZoom,
       pitch: 0,
       maxPitch: 68,
+      maxBounds: US_MAX_BOUNDS,
+      minZoom: US_MIN_ZOOM,
+      renderWorldCopies: false,
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "imperial", maxWidth: 120 }), "bottom-left");
+
+    fitMinZoomToBounds(map);
+    map.on("resize", () => fitMinZoomToBounds(map));
 
     map.on("load", () => {
       map.addSource("proposed-points", { type: "geojson", data: emptyFeatureCollection() });
@@ -238,6 +244,44 @@ export default function MapView() {
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over
   // the `absolute` utility class and collapses this container to zero height.
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
+}
+
+// A fixed minZoom that "roughly" fits US_MAX_BOUNDS only works for one window width — on a
+// wider viewport (or with the sidebar taking less room) the box ends up smaller than the
+// screen, and maxBounds' pan clamp can't stop you zooming out past that, leaving the map
+// floating in blank space. Recomputing the floor from the actual container size keeps the
+// box flush with the viewport at any window size.
+//
+// map.cameraForBounds()/fitBounds() intentionally compute a "contain" fit (the whole box
+// stays fully visible, so the *less* constraining axis is left with blank margin) — that's
+// backwards for a pan/zoom floor, which needs a "cover" fit (the box fills the viewport, so
+// the *more* constraining axis wins). MapLibre has no built-in "cover" helper, so this does
+// the Web Mercator math directly: the zoom needed to make each axis exactly fill the
+// container, then takes the larger (more-zoomed-in) of the two.
+function mercatorYFraction(lat: number) {
+  const rad = (lat * Math.PI) / 180;
+  return (1 - Math.log(Math.tan(Math.PI / 4 + rad / 2)) / Math.PI) / 2;
+}
+
+const MAPLIBRE_TILE_SIZE = 512;
+
+function coverZoomForBounds(
+  bounds: [[number, number], [number, number]],
+  width: number,
+  height: number
+) {
+  const lngFraction = Math.abs(bounds[1][0] - bounds[0][0]) / 360;
+  const latFraction = Math.abs(mercatorYFraction(bounds[1][1]) - mercatorYFraction(bounds[0][1]));
+  const zoomForWidth = Math.log2(width / (MAPLIBRE_TILE_SIZE * lngFraction));
+  const zoomForHeight = Math.log2(height / (MAPLIBRE_TILE_SIZE * latFraction));
+  return Math.max(zoomForWidth, zoomForHeight);
+}
+
+function fitMinZoomToBounds(map: maplibregl.Map) {
+  const { width, height } = map.getContainer().getBoundingClientRect();
+  if (width < 1 || height < 1) return;
+  const zoom = coverZoomForBounds(US_MAX_BOUNDS, width, height);
+  map.setMinZoom(Math.max(zoom, US_MIN_ZOOM));
 }
 
 function attachInteractivity(
