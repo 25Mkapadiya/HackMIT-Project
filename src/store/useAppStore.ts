@@ -38,10 +38,11 @@ interface AppState {
   setComparisonOpen: (v: boolean) => void;
 }
 
-let scenarioCounter = 0;
 function nextScenarioId() {
-  scenarioCounter += 1;
-  return `site-${scenarioCounter}`;
+  // Globally unique (not just per-session) since scenario ids are the
+  // primary key when persisted to Supabase — a sequential counter would
+  // collide across browser sessions.
+  return crypto.randomUUID();
 }
 
 const SITE_LABELS = ["Site A", "Site B", "Site C", "Site D", "Site E", "Site F"];

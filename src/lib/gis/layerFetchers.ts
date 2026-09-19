@@ -3,6 +3,8 @@ import { queryArcGisGeoJSON } from "./arcgis";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 import { WA_SOURCES } from "@/states/washington/sources";
 import { WA_EXISTING_DATA_CENTERS } from "@/states/washington/data/existingDataCenters";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import type { DataCenterProps } from "@/states/washington/data/existingDataCenters";
 
 export type Bbox = [number, number, number, number];
 
@@ -174,7 +176,31 @@ async function fetchPopulationTracts(bbox: Bbox) {
 
 // ----------------------------------------------------- EXISTING INFRA
 
-async function fetchDataCenters(bbox: Bbox): Promise<FeatureCollection<Point>> {
+async function fetchDataCenters(bbox: Bbox): Promise<FeatureCollection<Point, DataCenterProps>> {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    const { data, error } = await cached("wa-existing-data-centers", TTL.ONE_DAY, async () => {
+      return supabase.from("existing_data_centers").select("*").eq("state_code", "WA");
+    });
+    if (!error && data) {
+      const features: Feature<Point, DataCenterProps>[] = data
+        .filter((r) => inBbox(r.longitude, r.latitude, bbox))
+        .map((r) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [r.longitude, r.latitude] },
+          properties: {
+            name: r.name,
+            operator: r.operator ?? "Unknown",
+            city: r.city ?? "",
+            approxCriticalMw: r.known_mw ?? r.estimated_mw ?? null,
+            notes: r.notes ?? "",
+          },
+        }));
+      return { type: "FeatureCollection", features };
+    }
+    console.error("[fetchDataCenters] Supabase query failed, falling back to static list:", error);
+  }
+
   const features = WA_EXISTING_DATA_CENTERS.features.filter((f) =>
     inBbox(f.geometry.coordinates[0]!, f.geometry.coordinates[1]!, bbox)
   );
