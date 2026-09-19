@@ -17,6 +17,16 @@ import { TN_LAYER_FETCHERS } from "@/states/tennessee/layerFetchers";
 import { TN_SOURCES } from "@/states/tennessee/sources";
 import { KY_LAYER_FETCHERS } from "@/states/kentucky/layerFetchers";
 import { KY_SOURCES } from "@/states/kentucky/sources";
+import { FL_LAYER_FETCHERS } from "@/states/florida/layerFetchers";
+import { FL_SOURCES } from "@/states/florida/sources";
+import { GA_LAYER_FETCHERS } from "@/states/georgia/layerFetchers";
+import { GA_SOURCES } from "@/states/georgia/sources";
+import { SC_LAYER_FETCHERS } from "@/states/southcarolina/layerFetchers";
+import { SC_SOURCES } from "@/states/southcarolina/sources";
+import { NC_LAYER_FETCHERS } from "@/states/northcarolina/layerFetchers";
+import { NC_SOURCES } from "@/states/northcarolina/sources";
+import { VA_LAYER_FETCHERS } from "@/states/virginia/layerFetchers";
+import { VA_SOURCES } from "@/states/virginia/sources";
 
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
@@ -244,6 +254,101 @@ const KENTUCKY_BUNDLE = buildStandardBundle({
   },
 });
 
+const FLORIDA_BUNDLE = buildStandardBundle({
+  fetchers: FL_LAYER_FETCHERS,
+  hifldTransmission: FL_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: FL_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: FL_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (FPL, Duke Energy Florida, or TECO)",
+  environmentalReviewNote:
+    "Florida has no statewide zoning layer — county/municipal site-plan review is the primary local gating process. Flood, hurricane, and storm-surge risk should be weighted heavily in Florida site selection, and consumptive-use water permitting is administered regionally by one of Florida's five Water Management Districts rather than a single statewide agency.",
+  permittingNote: {
+    text: "Large facilities in Florida typically require county or municipal site-plan/zoning review and large-load service coordination directly with the serving utility (Florida operates largely as a standalone grid rather than a member of a traditional RTO). Florida also offers a sales-tax exemption for qualifying data-center property, administered through a state certification process with investment and critical-IT-load requirements (modified in 2025). Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "fl-permitting-general",
+      name: "Florida data-center siting — general regulatory context",
+      url: "https://www.floridajobs.org",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const GEORGIA_BUNDLE = buildStandardBundle({
+  fetchers: GA_LAYER_FETCHERS,
+  hifldTransmission: GA_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: GA_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: GA_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Georgia Power or an EMC)",
+  environmentalReviewNote:
+    "Georgia has no statewide zoning layer — county/municipal site-plan review is the primary local gating process. Georgia operates mostly vertically integrated utility territory (Georgia Power, EMCs, municipal systems) governed by the Georgia Territorial Electric Service Act rather than a competitive RTO market.",
+  permittingNote: {
+    text: "Large facilities in Georgia typically require county or municipal site-plan/zoning review and large-load service coordination directly with the serving utility (Georgia Power or an Electric Membership Corporation) — Georgia has no traditional RTO covering the whole state. Georgia also offers a High-Technology Data Center Equipment sales/use-tax exemption administered by the Department of Revenue, subject to investment and job-creation requirements. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ga-permitting-general",
+      name: "Georgia data-center siting — general regulatory context",
+      url: "https://www.georgia.org",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const SOUTH_CAROLINA_BUNDLE = buildStandardBundle({
+  fetchers: SC_LAYER_FETCHERS,
+  hifldTransmission: SC_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: SC_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: SC_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Dominion Energy, Duke Energy, or Santee Cooper)",
+  environmentalReviewNote:
+    "South Carolina has no statewide zoning layer — county/municipal site-plan review is the primary local gating process, alongside large-load coordination directly with the serving utility (the state is not fully organized under a traditional RTO). Coastal development should include hurricane and storm-surge resilience analysis.",
+  permittingNote: {
+    text: "Large facilities in South Carolina typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (Dominion Energy South Carolina, Duke Energy, Santee Cooper, or a cooperative). South Carolina also offers sales/use-tax exemptions for qualifying data centers, plus county-level Fee-In-Lieu-of-Tax (FILOT) arrangements. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "sc-permitting-general",
+      name: "South Carolina data-center siting — general regulatory context",
+      url: "https://www.sccommerce.com",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NORTH_CAROLINA_BUNDLE = buildStandardBundle({
+  fetchers: NC_LAYER_FETCHERS,
+  hifldTransmission: NC_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NC_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NC_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Duke Energy or Dominion Energy)",
+  environmentalReviewNote:
+    "North Carolina has no statewide zoning layer — county/municipal site-plan review is the primary local gating process, alongside large-load coordination directly with the serving utility. Hurricane-driven inland flooding is a significant planning consideration in eastern North Carolina.",
+  permittingNote: {
+    text: "Large facilities in North Carolina typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (Duke Energy Carolinas/Progress or Dominion Energy North Carolina). North Carolina offers sales/use-tax exemptions for qualifying data-center equipment (Commerce-certified), though it repealed the exemption on electricity used by qualifying data centers. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "nc-permitting-general",
+      name: "North Carolina data-center siting — general regulatory context",
+      url: "https://www.edpnc.com",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const VIRGINIA_BUNDLE = buildStandardBundle({
+  fetchers: VA_LAYER_FETCHERS,
+  hifldTransmission: VA_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: VA_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: VA_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM",
+  environmentalReviewNote:
+    "Virginia has no statewide zoning layer — county/municipal site-plan review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. Power availability and transmission deliverability have become significant siting factors given Northern Virginia's exceptional data-center growth.",
+  permittingNote: {
+    text: "Large facilities in Virginia typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (Dominion Energy Virginia or Appalachian Power) and PJM Interconnection. Virginia offers the Data Center Retail Sales and Use Tax Exemption (DCRSUT), generally requiring a Memorandum of Understanding with the Virginia Economic Development Partnership (VEDP) plus qualifying investment and job creation; a temporary electricity-consumption tax also began in 2026. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "va-permitting-general",
+      name: "Virginia data-center siting — general regulatory context",
+      url: "https://www.vedp.org",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -253,6 +358,11 @@ const BUNDLES: Record<string, StateGisBundle> = {
   alabama: ALABAMA_BUNDLE,
   tennessee: TENNESSEE_BUNDLE,
   kentucky: KENTUCKY_BUNDLE,
+  florida: FLORIDA_BUNDLE,
+  georgia: GEORGIA_BUNDLE,
+  southcarolina: SOUTH_CAROLINA_BUNDLE,
+  northcarolina: NORTH_CAROLINA_BUNDLE,
+  virginia: VIRGINIA_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {

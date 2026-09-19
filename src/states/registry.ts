@@ -7,6 +7,11 @@ import { MISSISSIPPI } from "./mississippi";
 import { ALABAMA } from "./alabama";
 import { TENNESSEE } from "./tennessee";
 import { KENTUCKY } from "./kentucky";
+import { FLORIDA } from "./florida";
+import { GEORGIA } from "./georgia";
+import { SOUTH_CAROLINA } from "./southcarolina";
+import { NORTH_CAROLINA } from "./northcarolina";
+import { VIRGINIA } from "./virginia";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -23,7 +28,21 @@ import { US_STATES_DIRECTORY } from "./directory";
  * and fly the map to any of them, without claiming analysis coverage that
  * doesn't exist yet.
  */
-const LIVE_STATES: StateDefinition[] = [WASHINGTON, OKLAHOMA, ARKANSAS, LOUISIANA, MISSISSIPPI, ALABAMA, TENNESSEE, KENTUCKY];
+const LIVE_STATES: StateDefinition[] = [
+  WASHINGTON,
+  OKLAHOMA,
+  ARKANSAS,
+  LOUISIANA,
+  MISSISSIPPI,
+  ALABAMA,
+  TENNESSEE,
+  KENTUCKY,
+  FLORIDA,
+  GEORGIA,
+  SOUTH_CAROLINA,
+  NORTH_CAROLINA,
+  VIRGINIA,
+];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(
   (s) => ({
