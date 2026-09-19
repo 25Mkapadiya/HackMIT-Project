@@ -154,6 +154,18 @@ async function fetchFloodZones(bbox: Bbox) {
   );
 }
 
+async function fetchNationalForestLands(bbox: Bbox) {
+  return queryArcGisGeoJSON(
+    WA_SOURCES.usfsNationalForestLands.url,
+    {
+      bbox,
+      outFields: "NFSLANDUNITNAME,NFSLANDUNITTYPE,REGION",
+      maxAllowableOffset: generalizationFor(bbox),
+    },
+    TTL.ONE_DAY
+  );
+}
+
 async function fetchStateHighways(bbox: Bbox) {
   return queryArcGisGeoJSON(
     WA_SOURCES.wsdotHighways.url,
@@ -227,6 +239,7 @@ const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> =
   "usgs-gauges": fetchUsgsGauges,
   "colocation-facilities": fetchColocationFacilities,
   "flood-zones": fetchFloodZones,
+  "national-forest-lands": fetchNationalForestLands,
   "state-highways": fetchStateHighways,
   "population-tracts": fetchPopulationTracts,
   "data-centers": fetchDataCenters,

@@ -126,6 +126,22 @@ export const WA_SOURCES = {
     refreshFrequency: "Semiannual BDC collection",
     methodology: "Retail fixed-broadband availability by provider/technology at a location — a proxy for connectivity, not long-haul fiber routes. Requires FCC_BDC_API_KEY.",
   },
+  usfsNationalForestLands: {
+    id: "usfs-national-forest-lands",
+    name: "USDA Forest Service — National Forest System Land Units",
+    url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_NFSLandUnit_01/MapServer/0",
+    license: "Public USDA Forest Service geospatial data",
+    refreshFrequency: "Live ArcGIS MapServer (Forest Service-maintained)",
+    methodology: "National Forest System land-unit polygons queried by bounding box. This maps Forest Service-administered land, not all tree canopy or privately owned forest.",
+  },
+  mapzenTerrain: {
+    id: "mapzen-terrain-tiles",
+    name: "Mapzen Terrain Tiles — AWS Open Data",
+    url: "https://registry.opendata.aws/terrain-tiles/",
+    license: "Open terrain dataset; attribution per Tilezen/Mapzen documentation",
+    refreshFrequency: "Public AWS terrain-tile dataset",
+    methodology: "Bare-earth elevation tiles rendered client-side by MapLibre as hillshade and optional 3D terrain. This is topography/elevation, not a land-ownership layer.",
+  },
   wsdotHighways: {
     id: "wsdot-functional-class",
     name: "WSDOT — State Highway Functional Classification",

@@ -53,7 +53,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
 export default function LayerControlPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const layerVisibility = useAppStore((s) => s.layerVisibility);
   const toggleLayer = useAppStore((s) => s.toggleLayer);
-  const [openCategories, setOpenCategories] = useState<Set<LayerCategory>>(new Set(["power", "water"]));
+  const [openCategories, setOpenCategories] = useState<Set<LayerCategory>>(new Set(["power", "water", "environment"]));
 
   function toggleCategory(cat: LayerCategory) {
     setOpenCategories((prev) => {

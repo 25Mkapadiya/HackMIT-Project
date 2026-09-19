@@ -59,7 +59,8 @@ export const WA_LAYERS: LayerDefinition[] = [
   },
   {
     id: "hydrography-waterbodies",
-    name: "Lakes & Reservoirs",
+    name: "Water Bodies (Lakes & Reservoirs)",
+    shortName: "Water Bodies",
     category: "water",
     geometryType: "polygon",
     source: WA_SOURCES.usgsNhdWaterbody,
@@ -146,6 +147,35 @@ export const WA_LAYERS: LayerDefinition[] = [
     ],
   },
 
+  {
+    id: "national-forest-lands",
+    name: "National Forest System Lands",
+    shortName: "Forests",
+    category: "environment",
+    geometryType: "polygon",
+    source: WA_SOURCES.usfsNationalForestLands,
+    confidence: "fact",
+    description:
+      "USDA Forest Service National Forest System land-unit boundaries. Shows federally administered forest/grassland units, not all forest canopy.",
+    defaultVisible: false,
+    endpoint: "/api/gis/national-forest-lands",
+    color: "#4fa86f",
+    legend: [{ label: "National Forest System land", color: "#4fa86f", swatch: "fill" }],
+  },
+  {
+    id: "terrain-hillshade",
+    name: "Terrain / Mountains",
+    shortName: "Terrain",
+    category: "environment",
+    geometryType: "raster",
+    source: WA_SOURCES.mapzenTerrain,
+    confidence: "fact",
+    description:
+      "Bare-earth elevation rendered as hillshade and 3D terrain from the public Mapzen Terrain Tiles dataset on AWS.",
+    defaultVisible: false,
+    color: "#a99b83",
+    legend: [{ label: "Elevation / mountain relief", color: "#a99b83", swatch: "fill" }],
+  },
   {
     id: "state-highways",
     name: "State Highways",
