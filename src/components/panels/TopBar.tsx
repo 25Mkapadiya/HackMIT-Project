@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { STATE_REGISTRY, getState, getEnabledStates } from "@/states/registry";
+import { STATE_REGISTRY, getState, getShowAllStates } from "@/states/registry";
 
 export default function TopBar() {
   const proposeMode = useAppStore((s) => s.proposeMode);
@@ -19,7 +19,7 @@ export default function TopBar() {
   const stateSearchRef = useRef<HTMLDivElement>(null);
 
   const activeState = getState(activeStateId);
-  const implementedStates = getEnabledStates();
+  const implementedStates = getShowAllStates();
   const subtitle = showAllStates
     ? `Showing all ${implementedStates.length} implemented states`
     : activeState?.enabled
