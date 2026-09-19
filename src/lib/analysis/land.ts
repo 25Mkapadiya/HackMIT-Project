@@ -1,11 +1,12 @@
 import * as turf from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, Polygon, MultiPolygon } from "geojson";
 import type { LandAnalysis, ScenarioConfig } from "@/lib/types";
-import { bboxAroundMiles, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
+import { getFetcher, getStateGisBundle, noDatasetSource } from "@/lib/gis/stateGis";
+import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
+import { bboxAroundMiles, milesBetween, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
 import { ACREAGE_PER_MW, POPULATION_RADIUS_MI } from "@/lib/constants/assumptions";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 import { getHazards } from "@/lib/supabase/queries";
-import { fetchLayer, getSource, type StateAnalysisContext } from "./context";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -111,24 +112,22 @@ async function getPopulationWithin5mi(
   }
 }
 
-export async function computeLandAnalysis(scenario: ScenarioConfig, ctx: StateAnalysisContext): Promise<LandAnalysis> {
-  const { lng, lat, mwLoad, acreageOverride } = scenario;
-  const femaSource = getSource(ctx, "femaNfhl");
-  const epqsSource = getSource(ctx, "usgsEpqs");
-  const roadsSource = getSource(ctx, "roads");
-  const censusSource = getSource(ctx, "censusAcs");
-  const hasRoadsLayer = Boolean(ctx.fetchers["state-highways"]);
+export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<LandAnalysis> {
+  const { lng, lat, mwLoad, acreageOverride, stateId } = scenario;
+  const bundle = getStateGisBundle(stateId);
 
   const floodBbox = bboxAroundMiles(lng, lat, 5);
   const roadBbox = bboxAroundMiles(lng, lat, 15);
   const tractBbox = bboxAroundMiles(lng, lat, POPULATION_RADIUS_MI + 2);
 
   const [floodFc, roadsFc, tractsFc, elevationFt, hazards] = await Promise.all([
-    fetchLayer<FloodProps>(ctx, "flood-zones", floodBbox),
-    fetchLayer<RoadProps>(ctx, "state-highways", roadBbox),
-    fetchLayer<TractProps>(ctx, "population-tracts", tractBbox),
+    getFetcher(stateId, "flood-zones")(floodBbox) as Promise<FeatureCollection<Geometry, FloodProps>>,
+    bundle.roads
+      ? (getFetcher(stateId, bundle.roads.layerId)(roadBbox) as Promise<FeatureCollection<Geometry, RoadProps>>)
+      : Promise.resolve<FeatureCollection<Geometry, RoadProps>>({ type: "FeatureCollection", features: [] }),
+    getFetcher(stateId, "population-tracts")(tractBbox) as Promise<FeatureCollection<Geometry, TractProps>>,
     getElevationFt(lng, lat),
-    getHazards(ctx.stateCode),
+    getHazards(bundle.stateCode),
   ]);
 
   const floodZone = polygonContaining(lng, lat, floodFc);
@@ -148,10 +147,7 @@ export async function computeLandAnalysis(scenario: ScenarioConfig, ctx: StateAn
   if (floodZone) {
     constraints.push(`Site falls within FEMA flood zone ${zoneCode ?? "(unclassified)"}${isHighRisk ? " — high-risk (SFHA)" : ""}.`);
   }
-  constraints.push(
-    ctx.environmentalReviewNote ??
-      "State and/or federal environmental review is likely required for a project of this scale — confirm the applicable process directly."
-  );
+  constraints.push(bundle.environmentalReviewNote);
 
   const acreage = acreageOverride ?? Math.round(mwLoad * ACREAGE_PER_MW.typical * 10) / 10;
 
@@ -160,7 +156,7 @@ export async function computeLandAnalysis(scenario: ScenarioConfig, ctx: StateAn
       label: "FEMA flood zone",
       value: floodZone ? `${zoneCode ?? "Unclassified"}${isHighRisk ? " (high-risk / SFHA)" : ""}` : "Not in a mapped FEMA flood hazard zone (or unmapped area)",
       confidence: "fact",
-      source: femaSource,
+      source: NATIONAL_SOURCES.femaNfhl,
       caveats: !floodZone ? ["Absence of a mapped zone can also mean the area has not been studied by FEMA."] : undefined,
     },
     elevationFt: {
@@ -168,30 +164,37 @@ export async function computeLandAnalysis(scenario: ScenarioConfig, ctx: StateAn
       value: elevationFt,
       unit: "ft",
       confidence: elevationFt != null ? "fact" : "unknown",
-      source: epqsSource,
+      source: NATIONAL_SOURCES.usgsEpqs,
     },
-    nearestMajorRoadMiles: {
-      label: "Nearest state highway (functional class ≤ 3)",
-      value: hasRoadsLayer ? nearestMajorRoad.distanceMiles : null,
-      unit: "mi",
-      confidence: hasRoadsLayer && nearestMajorRoad.feature ? "fact" : "unknown",
-      source: roadsSource,
-      caveats: hasRoadsLayer
-        ? ["State-route network only — does not include county/city arterials or private access roads."]
-        : [`No state highway/roads dataset is integrated for ${ctx.stateCode} yet.`],
-    },
+    nearestMajorRoadMiles: bundle.roads
+      ? {
+          label: bundle.roads.label,
+          value: nearestMajorRoad.distanceMiles,
+          unit: "mi",
+          confidence: nearestMajorRoad.feature ? "fact" : "unknown",
+          source: bundle.roads.source,
+          caveats: ["State-route network only — does not include county/city arterials or private access roads."],
+        }
+      : {
+          label: "Nearest major road",
+          value: null,
+          unit: "mi",
+          confidence: "unknown",
+          source: noDatasetSource("road-classification"),
+          caveats: ["No verified state road-classification GIS layer is integrated for this state yet."],
+        },
     populationWithin5mi: {
       label: `Estimated population within ${POPULATION_RADIUS_MI} mi`,
       value: population.value,
       confidence: population.confidence,
-      source: censusSource,
+      source: NATIONAL_SOURCES.censusAcs,
       caveats: population.caveats,
     },
     environmentalConstraints: {
       label: "Environmental / regulatory constraints",
       value: constraints,
       confidence: "proxy",
-      source: femaSource,
+      source: NATIONAL_SOURCES.femaNfhl,
       caveats: [
         "Not a substitute for a wetlands, species, or cultural-resource survey. Only flood-zone status is derived from GIS data here.",
       ],
@@ -216,15 +219,15 @@ export async function computeLandAnalysis(scenario: ScenarioConfig, ctx: StateAn
         .map((h) => `${titleCase(h.hazard_type)} — ${h.risk_level.toUpperCase()}`),
       confidence: hazards.length > 0 ? "fact" : "unknown",
       source: {
-        id: `curated-${ctx.stateCode.toLowerCase()}-hazards`,
-        name: `Curated ${ctx.stateCode} natural hazard assessment`,
+        id: `curated-${bundle.stateCode.toLowerCase()}-hazards`,
+        name: `Curated ${bundle.stateCode} natural hazard assessment`,
         url: "",
         methodology: "State-level hazard list, not resolved to this specific coordinate — some hazards (e.g. lahar or riverine flood zones) are valley/basin-specific and require a site-level check.",
       },
       caveats:
         hazards.length > 0
           ? ["Statewide baseline, not site-specific — a formal geotechnical/hazard study is required before design."]
-          : [`No curated hazard assessment has been entered for ${ctx.stateCode} yet.`],
+          : [`No curated hazard assessment has been entered for ${bundle.stateCode} yet.`],
     },
   };
 }

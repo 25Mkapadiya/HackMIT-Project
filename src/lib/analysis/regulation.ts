@@ -1,7 +1,8 @@
 import type { RegulationAnalysis, ScenarioConfig } from "@/lib/types";
 import { cached, TTL } from "@/lib/cache/memoryCache";
+import { getStateGisBundle } from "@/lib/gis/stateGis";
+import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { getUtilities, matchUtility } from "@/lib/supabase/queries";
-import { getSource, type StateAnalysisContext } from "./context";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -29,14 +30,12 @@ async function reverseGeocodeCounty(lng: number, lat: number): Promise<string | 
 
 export async function computeRegulationAnalysis(
   scenario: ScenarioConfig,
-  utilityTerritoryName: string | null,
-  ctx: StateAnalysisContext
+  utilityTerritoryName: string | null
 ): Promise<RegulationAnalysis> {
-  const utilityTerritorySource = getSource(ctx, "utilityTerritories");
-
+  const bundle = getStateGisBundle(scenario.stateId);
   const [county, utilities] = await Promise.all([
     reverseGeocodeCounty(scenario.lng, scenario.lat),
-    getUtilities(ctx.stateCode),
+    getUtilities(bundle.stateCode),
   ]);
   const utility = matchUtility(utilityTerritoryName, utilities);
 
@@ -45,31 +44,19 @@ export async function computeRegulationAnalysis(
       label: "Utility service territory",
       value: utilityTerritoryName,
       confidence: utilityTerritoryName ? "proxy" : "unknown",
-      source: utilityTerritorySource,
+      source: bundle.utilityTerritorySource,
     },
     county: {
       label: "County",
       value: county,
       confidence: county ? "fact" : "unknown",
-      source: {
-        id: "census-geocoder",
-        name: "US Census Bureau Geocoder",
-        url: "https://geocoding.geo.census.gov/geocoder/",
-        methodology: "Reverse point-in-polygon lookup against current county boundaries.",
-      },
+      source: NATIONAL_SOURCES.censusGeocoder,
     },
     permittingNote: {
       label: "General permitting context",
-      value:
-        ctx.permittingNote ??
-        "Large facilities typically trigger county conditional-use/site-plan review and, depending on size and location, state environmental review. Utility interconnection is a separate process from land-use permitting.",
+      value: bundle.permittingNote.text,
       confidence: "estimated",
-      source: {
-        id: `${ctx.stateId}-permitting-general`,
-        name: `${ctx.stateCode} general permitting reference`,
-        url: "",
-        methodology: "General regulatory context, not a jurisdiction-specific legal determination.",
-      },
+      source: bundle.permittingNote.source,
       caveats: ["This is general context, not legal or permitting advice — requirements vary by county and project."],
     },
     utilityLargeLoadContact: {
@@ -77,8 +64,8 @@ export async function computeRegulationAnalysis(
       value: utility ? utility.large_load_process_url ?? utility.website ?? utility.name : null,
       confidence: utility ? "fact" : "unknown",
       source: {
-        id: `curated-${ctx.stateCode.toLowerCase()}-utilities`,
-        name: `Curated ${ctx.stateCode} utility directory (large-load process & contacts)`,
+        id: `curated-${bundle.stateCode.toLowerCase()}-utilities`,
+        name: `Curated ${bundle.stateCode} utility directory (large-load process & contacts)`,
         url: "",
         methodology: "Utility resolved by matching the live service-territory name to a hand-curated utility record.",
       },

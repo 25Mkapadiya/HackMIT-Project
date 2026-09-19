@@ -1,10 +1,11 @@
 import type { SourceMeta } from "@/lib/types";
 
 /**
- * Source metadata for datasets that are genuinely nationwide (same URL/schema
- * for any US state) — shared by every state's own sources.ts rather than
- * copy-pasted. Per the two-layer build principle: national layer once, state
- * layers add only what's actually state-specific.
+ * Source metadata for datasets that are genuinely nationwide (bbox-driven, no
+ * state-specific hosting) — shared by every StateDefinition instead of being
+ * re-declared per state. See src/lib/gis/nationalFetchers.ts for the matching
+ * fetch functions and src/lib/gis/stateGis.ts for how a state's LayerDefinition
+ * list wires these in alongside its own state-specific sources.
  */
 export const NATIONAL_SOURCES = {
   usgsNhdFlowline: {
@@ -29,7 +30,7 @@ export const NATIONAL_SOURCES = {
     url: "https://waterservices.usgs.gov/nwis/iv/",
     license: "Public domain (USGS)",
     refreshFrequency: "Near real-time instantaneous values",
-    methodology: "Active surface-water gauge sites with current discharge reading, filtered by state code and radius.",
+    methodology: "Active surface-water gauge sites with current discharge reading, filtered by state and bounding box.",
   },
   usgsEpqs: {
     id: "usgs-epqs",
@@ -61,7 +62,7 @@ export const NATIONAL_SOURCES = {
     url: "https://api.census.gov/data/2022/acs/acs5",
     license: "Public domain (US Census Bureau)",
     refreshFrequency: "Annual (ACS 5-year release)",
-    methodology: "Tract-level population, area-weighted against a radius buffer.",
+    methodology: "Tract-level population, area-weighted against a 5-mile radius buffer.",
   },
   censusTiger: {
     id: "census-tigerweb",
@@ -102,5 +103,48 @@ export const NATIONAL_SOURCES = {
     license: "Public domain (USGS)",
     refreshFrequency: "USGS cached basemap service",
     methodology: "Cached shaded-relief tiles derived from 3DEP at large/medium scales, displayed as a low-opacity terrain context layer with no 3D extrusion.",
+  },
+  censusGeocoder: {
+    id: "census-geocoder",
+    name: "US Census Bureau Geocoder",
+    url: "https://geocoding.geo.census.gov/geocoder/",
+    license: "Public domain (US Census Bureau)",
+    refreshFrequency: "Live geocoder",
+    methodology: "Reverse point-in-polygon lookup against current county boundaries.",
+  },
+  /**
+   * HIFLD's own Open Data hub was deactivated 2025-08-26. This is a live ArcGIS
+   * Online mirror of the same HIFLD "Electric Power Transmission Lines" extract
+   * (sourced from Oak Ridge National Laboratory / EIA-861 / EIA-860), hosted by
+   * the DOE NETL Energy Transition Atlas. Nationwide, bbox-queryable.
+   */
+  hifldTransmission: {
+    id: "hifld-transmission-lines",
+    name: "HIFLD — Electric Power Transmission Lines (via DOE NETL Energy Transition Atlas mirror)",
+    url: "https://arcgis.netl.doe.gov/server/rest/services/Hosted/Energy_Transition_Atlas_493d6/FeatureServer/18",
+    license: "Public (HIFLD / Oak Ridge National Laboratory)",
+    refreshFrequency: "Static extract mirrored from HIFLD Open (last HIFLD refresh: 2025)",
+    methodology: "Nationwide high-voltage transmission line geometry queried by bounding box; voltage/owner normalized from the HIFLD VOLTAGE/OWNER attributes.",
+  },
+  /**
+   * Same HIFLD-deactivation situation — this is a live ArcGIS Online mirror
+   * (re-hosted 2025-08-21, "will not be updated") of HIFLD's nationwide
+   * "Electric Retail Service Territories" polygons.
+   */
+  hifldUtilityTerritories: {
+    id: "hifld-electric-retail-service-territories",
+    name: "HIFLD — Electric Retail Service Territories (static 2025-08-21 mirror)",
+    url: "https://services3.arcgis.com/OYP7N6mAJJCyH6hd/arcgis/rest/services/Electric_Retail_Service_Territories_HIFLD/FeatureServer/0",
+    license: "Public (HIFLD / Oak Ridge National Laboratory, DOE CESER)",
+    refreshFrequency: "Static snapshot (downloaded from HIFLD 2025-08-21; source dataset will not be updated further)",
+    methodology: "Point-in-polygon lookup against nationwide retail electric service territory boundaries.",
+  },
+  usDroughtMonitor: {
+    id: "us-drought-monitor",
+    name: "U.S. Drought Monitor — Current Conditions",
+    url: "https://services5.arcgis.com/0OTVzJS4K09zlixn/arcgis/rest/services/USDM_current/FeatureServer/0",
+    license: "Public (NDMC / NOAA / USDA)",
+    refreshFrequency: "Weekly, released Thursdays",
+    methodology: "Point-in-polygon lookup against the current weekly drought classification (D0 abnormally dry through D4 exceptional drought).",
   },
 } satisfies Record<string, SourceMeta>;

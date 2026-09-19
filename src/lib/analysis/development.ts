@@ -1,14 +1,14 @@
 import type { DevelopmentEstimate, LandAnalysis, ScenarioConfig } from "@/lib/types";
 import { CONSTRUCTION_COST_PER_MW_USD, DEVELOPMENT_TIMELINE_YEARS } from "@/lib/constants/assumptions";
 import { getIncentives } from "@/lib/supabase/queries";
-import type { StateAnalysisContext } from "./context";
+import { getStateGisBundle } from "@/lib/gis/stateGis";
 
 export async function computeDevelopmentEstimate(
   scenario: ScenarioConfig,
-  land: LandAnalysis,
-  ctx: StateAnalysisContext
+  land: LandAnalysis
 ): Promise<DevelopmentEstimate> {
-  const incentives = await getIncentives(ctx.stateCode);
+  const bundle = getStateGisBundle(scenario.stateId);
+  const incentives = await getIncentives(bundle.stateCode);
   const [lowPerMw, highPerMw] = CONSTRUCTION_COST_PER_MW_USD;
   const low = Math.round((lowPerMw * scenario.mwLoad) / 1_000_000) * 1_000_000;
   const high = Math.round((highPerMw * scenario.mwLoad) / 1_000_000) * 1_000_000;
@@ -48,8 +48,8 @@ export async function computeDevelopmentEstimate(
       value: incentives.map((i) => `${i.title} (${i.status})`),
       confidence: "proxy",
       source: {
-        id: `curated-${ctx.stateCode.toLowerCase()}-incentives`,
-        name: `Curated ${ctx.stateCode} data center tax incentive tracker`,
+        id: `curated-${bundle.stateCode.toLowerCase()}-incentives`,
+        name: `Curated ${bundle.stateCode} data center tax incentive tracker`,
         url: "",
         methodology: "Compiled from statute/agency guidance references, not a per-site eligibility determination.",
       },

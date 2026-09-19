@@ -1,59 +1,36 @@
-import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
-import { queryArcGisGeoJSON } from "@/lib/gis/arcgis";
-import { MN_SOURCES } from "./sources";
+import type { FeatureCollection } from "geojson";
+import { queryArcGisGeoJSON, type Bbox } from "@/lib/gis/arcgis";
 import {
-  fetchFloodZones,
+  fetchUsgsGauges,
+  fetchColocationFacilities,
+  fetchFemaFloodZones,
   fetchPopulationTracts,
-  generalizationFor,
-  makeColocationFacilitiesFetcher,
-  makeDataCentersFetcher,
-  makePowerPlantsFetcher,
-  makeUsgsGaugesFetcher,
-  withGracefulDegradation,
-} from "@/lib/gis/nationalLayers";
-import type { Bbox, LayerFetcher } from "@/lib/gis/types";
+  fetchEiaPowerPlants,
+  fetchHifldTransmissionLines,
+  fetchUsDroughtMonitor,
+  makeExistingDataCentersFetcher,
+} from "@/lib/gis/nationalFetchers";
+import { MN_SOURCES } from "./sources";
 
 /**
  * Minnesota-specific fetchers. Raw ArcGIS field names differ from the
  * HIFLD/BPA-derived vocabulary the rest of the app (power.ts, popupContent.ts,
  * layerStyles.ts) already reads — each fetcher below remaps the state's own
- * schema into that same vocabulary (XRefCd/OperatingLineNm/VoltageMeas for
- * transmission, Name for utility territory, GNIS_Name for hydrography) at
- * the fetch boundary, so nothing downstream needs to know Minnesota's field
- * names. See src/lib/gis/nationalLayers.ts for the shared national fetchers
- * (population, flood zones, generation, colocation, streamflow, data centers).
+ * schema into that same vocabulary (Name for utility territory, GNIS_Name for
+ * hydrography) at the fetch boundary, so nothing downstream needs to know
+ * Minnesota's field names. See src/lib/gis/nationalFetchers.ts for the shared
+ * national fetchers (transmission, population, flood zones, generation,
+ * colocation, streamflow, drought, data centers).
+ *
+ * No "water-diversions" entry: Minnesota's water-appropriation-permit system
+ * (MPARS) is a login-gated web app with no public REST/GIS endpoint — land.ts's
+ * nearbyWaterRightsCount metric degrades to UNKNOWN rather than guessing.
  */
 
 // ---------------------------------------------------------------- POWER
-
-interface HifldTransmissionProps {
-  ID?: string;
-  VOLTAGE?: number;
-  OWNER?: string;
-  STATUS?: string;
-  SUB_1?: string;
-  SUB_2?: string;
-}
-
-async function fetchTransmissionLines(bbox: Bbox) {
-  const raw = await queryArcGisGeoJSON<HifldTransmissionProps>(MN_SOURCES.transmissionNational.url, {
-    bbox,
-    outFields: "ID,VOLTAGE,OWNER,STATUS,SUB_1,SUB_2",
-  });
-  return {
-    type: "FeatureCollection" as const,
-    features: raw.features.map((f) => ({
-      ...f,
-      properties: {
-        XRefCd: f.properties?.ID ?? null,
-        OperatingLineNm: [f.properties?.SUB_1, f.properties?.SUB_2].filter(Boolean).join(" – ") || null,
-        VoltageMeas: nullIfSentinel(f.properties?.VOLTAGE),
-        Owner: f.properties?.OWNER && f.properties.OWNER !== "NOT AVAILABLE" ? f.properties.OWNER : null,
-        Status: f.properties?.STATUS ?? null,
-      },
-    })),
-  };
-}
+// Minnesota's own official transmission-line dataset (MnGeo util-elec-trans)
+// was withdrawn — Commerce could not keep it accurate — so transmission uses
+// the shared nationwide HIFLD mirror, same as Oklahoma.
 
 interface HifldSubstationProps {
   ID?: string;
@@ -97,6 +74,11 @@ interface EusaProps {
   type?: string;
 }
 
+function generalizationFor(bbox: Bbox): number {
+  const width = bbox[2] - bbox[0];
+  return Math.max(0.00005, width / 600);
+}
+
 async function fetchUtilityTerritories(bbox: Bbox) {
   const raw = await queryArcGisGeoJSON<EusaProps>(MN_SOURCES.utilityServiceAreas.url, {
     bbox,
@@ -116,21 +98,20 @@ async function fetchUtilityTerritories(bbox: Bbox) {
 }
 
 // ---------------------------------------------------------------- WATER
+// Minnesota DNR's own Public Waters Inventory is used in place of the shared
+// nationwide USGS NHD hydrography — more current MN-specific naming.
 
 interface PwiWatercourseProps {
   kittle_name?: string;
-  length_mi?: number;
 }
 interface PwiBasinProps {
   pw_basin_name?: string;
-  pwi_label?: string;
-  acres?: number;
 }
 
 async function fetchHydrographyRivers(bbox: Bbox) {
   const raw = await queryArcGisGeoJSON<PwiWatercourseProps>(MN_SOURCES.dnrPublicWatersLines.url, {
     bbox,
-    outFields: "kittle_name,length_mi",
+    outFields: "kittle_name",
   });
   return {
     type: "FeatureCollection" as const,
@@ -144,14 +125,16 @@ async function fetchHydrographyRivers(bbox: Bbox) {
 async function fetchHydrographyWaterbodies(bbox: Bbox) {
   const raw = await queryArcGisGeoJSON<PwiBasinProps>(MN_SOURCES.dnrPublicWatersBasins.url, {
     bbox,
-    outFields: "pw_basin_name,pwi_label,acres",
+    outFields: "pw_basin_name",
     maxAllowableOffset: generalizationFor(bbox),
   });
   return {
     type: "FeatureCollection" as const,
     features: raw.features.map((f) => ({
       ...f,
-      properties: { GNIS_Name: f.properties?.pw_basin_name && f.properties.pw_basin_name !== "Unnamed" ? f.properties.pw_basin_name : null },
+      properties: {
+        GNIS_Name: f.properties?.pw_basin_name && f.properties.pw_basin_name !== "Unnamed" ? f.properties.pw_basin_name : null,
+      },
     })),
   };
 }
@@ -186,20 +169,37 @@ async function fetchProtectedLand(bbox: Bbox) {
   });
 }
 
-const RAW_FETCHERS: Record<string, LayerFetcher<any>> = {
-  "transmission-lines": fetchTransmissionLines,
+const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = {
+  "transmission-lines": fetchHifldTransmissionLines,
   "substations": fetchSubstations,
   "utility-territories": fetchUtilityTerritories,
   "hydrography-rivers": fetchHydrographyRivers,
   "hydrography-waterbodies": fetchHydrographyWaterbodies,
-  "usgs-gauges": makeUsgsGaugesFetcher("MN"),
-  "colocation-facilities": makeColocationFacilitiesFetcher("MN"),
+  "drought-areas": fetchUsDroughtMonitor,
+  "usgs-gauges": (bbox) => fetchUsgsGauges(bbox, "MN"),
+  "colocation-facilities": (bbox) => fetchColocationFacilities(bbox, "MN"),
   "broadband-coverage": fetchBroadbandCoverage,
-  "flood-zones": fetchFloodZones,
+  "flood-zones": fetchFemaFloodZones,
   "protected-land": fetchProtectedLand,
   "population-tracts": fetchPopulationTracts,
-  "data-centers": makeDataCentersFetcher("MN"),
-  "power-plants": makePowerPlantsFetcher("MN"),
+  "data-centers": makeExistingDataCentersFetcher("MN"),
+  "power-plants": (bbox) => fetchEiaPowerPlants(bbox, "MN"),
+  // No "state-highways" entry: no verified Minnesota road-classification GIS
+  // service was found for this integration. land.ts's nearestMajorRoadMiles
+  // metric degrades to UNKNOWN for Minnesota rather than guessing.
 };
 
-export const MN_LAYER_FETCHERS: Record<string, LayerFetcher<any>> = withGracefulDegradation(RAW_FETCHERS);
+/** Same fail-soft wrapping as WA_LAYER_FETCHERS/OK_LAYER_FETCHERS — see those files for rationale. */
+export const MN_LAYER_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = Object.fromEntries(
+  Object.entries(RAW_FETCHERS).map(([layerId, fetcher]) => [
+    layerId,
+    async (bbox: Bbox): Promise<FeatureCollection> => {
+      try {
+        return await fetcher(bbox);
+      } catch (err) {
+        console.error(`[mn-layer:${layerId}] fetch failed, treating as unavailable:`, err instanceof Error ? err.message : err);
+        return { type: "FeatureCollection", features: [] };
+      }
+    },
+  ])
+);

@@ -4,15 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { LayerDefinition } from "@/lib/types";
+import { WASHINGTON } from "@/states/washington";
 import { getState, DEFAULT_STATE_ID } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
+import type { LayerDefinition } from "@/lib/types";
 import { BASEMAP_STYLE, US_MAX_BOUNDS, US_MIN_ZOOM, emptyFeatureCollection } from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
 import { buildPopupHtml } from "./popupContent";
 
-function statewideBbox(state: { bounds: [[number, number], [number, number]] }): string {
+function stateBboxParam(stateId: string): string {
+  const state = getState(stateId) ?? getState(DEFAULT_STATE_ID)!;
   return [state.bounds[0][0], state.bounds[0][1], state.bounds[1][0], state.bounds[1][1]].join(",");
 }
 
@@ -21,6 +23,11 @@ export default function MapView() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
+  // Layer ids (e.g. "transmission-lines") are stable across states even though
+  // the underlying source is swapped out on state switch (see the teardown
+  // logic below) — click/hover handlers are bound to that stable layer id
+  // string, so they only need registering once, ever, per layer id.
+  const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
   const focusAnimatingRef = useRef(false);
@@ -37,12 +44,11 @@ export default function MapView() {
   // ---- init map (once) ----
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const defaultState = getState(DEFAULT_STATE_ID)!;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: BASEMAP_STYLE,
-      center: defaultState.center,
-      zoom: defaultState.defaultZoom,
+      center: WASHINGTON.center,
+      zoom: WASHINGTON.defaultZoom,
       pitch: 0,
       maxPitch: 68,
       maxBounds: US_MAX_BOUNDS,
@@ -185,55 +191,58 @@ export default function MapView() {
   }, [mapReady, proposeMode, addScenario]);
 
   // ---- fly to the picked state's real bounds (state picker in TopBar) ----
-  const isFirstStateSync = useRef(true);
+  // Tracks which state the map is currently showing (seeded with the state active
+  // at first render, before any user interaction is possible) and flies whenever
+  // activeStateId no longer matches it — including back to the original default.
+  // Comparing against a live "last applied" value, updated on every real
+  // transition, avoids a race where switching states before the map's initial
+  // `load` event fires would otherwise be silently swallowed by an ordinal
+  // "skip the first run" guard, while still correctly re-flying if the user
+  // later returns to that same initial state.
+  const lastAppliedStateIdRef = useRef(activeStateId);
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    if (isFirstStateSync.current) {
-      // Skip the initial mount — the map already opens on Washington's bounds.
-      isFirstStateSync.current = false;
-      return;
-    }
-    const state = getState(activeStateId);
-    if (!state) return;
-    mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
-  }, [mapReady, activeStateId]);
-
-  // ---- tear down the previous state's map layers on a state switch ----
-  // Layer ids are shared across states for the same concept (e.g.
-  // "transmission-lines"), so without this, switching from Washington to
-  // Minnesota would just re-show Washington's already-loaded transmission
-  // geometry instead of fetching Minnesota's.
-  const isFirstLayerReset = useRef(true);
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    if (isFirstLayerReset.current) {
-      isFirstLayerReset.current = false;
-      return;
-    }
-    const map = mapRef.current;
-    for (const layerId of loadedLayerIds.current) {
-      for (const suffix of ["-line", "-fill", "-outline", "-point"]) {
-        const mlId = `${layerId}${suffix}`;
-        if (map.getLayer(mlId)) map.removeLayer(mlId);
+    if (activeStateId !== lastAppliedStateIdRef.current) {
+      const state = getState(activeStateId);
+      if (state) {
+        mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
       }
-      const sourceId = `src-${layerId}`;
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
     }
-    loadedLayerIds.current.clear();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    lastAppliedStateIdRef.current = activeStateId;
   }, [mapReady, activeStateId]);
 
   // ---- load/toggle infrastructure layers ----
+  const lastSyncedStateId = useRef<string | null>(null);
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    const state = getState(activeStateId);
-    if (!state) return;
-    const bbox = statewideBbox(state);
+    const state = getState(activeStateId) ?? getState(DEFAULT_STATE_ID)!;
+    const bboxParam = stateBboxParam(activeStateId);
+
+    // Switching states: a layer id like "transmission-lines" means a different
+    // upstream dataset per state (see src/lib/gis/stateGis.ts), so the previously
+    // loaded sources/layers must be torn down rather than left showing the old
+    // state's data under the new state's map.
+    if (lastSyncedStateId.current !== null && lastSyncedStateId.current !== activeStateId) {
+      const previousState = getState(lastSyncedStateId.current);
+      for (const layerId of loadedLayerIds.current) {
+        const previousLayer = previousState?.layers.find((l) => l.id === layerId);
+        if (previousLayer) {
+          for (const spec of buildLayerSpecs(previousLayer, `src-${layerId}`)) {
+            if (map.getLayer(spec.id)) map.removeLayer(spec.id);
+          }
+        }
+        if (map.getSource(`src-${layerId}`)) map.removeSource(`src-${layerId}`);
+      }
+      loadedLayerIds.current.clear();
+      loadingLayerIds.current.clear();
+    }
+    lastSyncedStateId.current = activeStateId;
 
     async function syncLayers() {
-      for (const layer of state!.layers) {
-        // Visual raster layers are loaded directly by MapLibre rather than through the GeoJSON API.
+      for (const layer of state.layers) {
+        // Visual raster layers (forest cover, terrain relief) are loaded directly
+        // by MapLibre in their own effects below, not through the GeoJSON API.
         if (layer.geometryType === "raster") continue;
         const wantVisible = Boolean(layerVisibility[layer.id]);
         const sourceId = `src-${layer.id}`;
@@ -243,16 +252,19 @@ export default function MapView() {
           if (loadingLayerIds.current.has(layer.id)) continue;
           loadingLayerIds.current.add(layer.id);
           try {
-            const res = await fetch(`${layer.endpoint}?bbox=${bbox}`);
+            const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${activeStateId}`);
             const data = (await res.json()) as FeatureCollection;
-            if (!mapRef.current) return;
+            if (!mapRef.current || lastSyncedStateId.current !== activeStateId) return;
             if (!map.getSource(sourceId)) {
               map.addSource(sourceId, { type: "geojson", data });
               const specs = buildLayerSpecs(layer, sourceId);
               for (const spec of specs) {
                 if (!map.getLayer(spec.id)) map.addLayer(spec);
               }
-              attachInteractivity(map, layer, popupRef);
+              if (!interactivityAttached.current.has(layer.id)) {
+                attachInteractivity(map, layer, popupRef);
+                interactivityAttached.current.add(layer.id);
+              }
             }
             loadedLayerIds.current.add(layer.id);
           } catch (err) {
@@ -272,7 +284,7 @@ export default function MapView() {
     }
 
     syncLayers();
-  }, [mapReady, layerVisibility, activeStateId]);
+  }, [mapReady, activeStateId, layerVisibility]);
 
   // ---- U.S. visual forest cover ----
   useEffect(() => {
@@ -283,6 +295,7 @@ export default function MapView() {
 
     // Reuse the CARTO basemap's vector land-cover source so forest edges stay
     // crisp and map-like at every zoom instead of looking like a scientific raster.
+    // Nationwide — the same layer works unmodified for every state.
     if (!map.getLayer(layerId) && map.getSource("carto")) {
       map.addLayer(
         {
@@ -320,7 +333,7 @@ export default function MapView() {
     } else if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
     }
-  }, [mapReady, layerVisibility, activeStateId]);
+  }, [mapReady, layerVisibility]);
 
   // ---- U.S.-only terrain / mountains: cached USGS National Map shaded relief ----
   useEffect(() => {
@@ -379,19 +392,16 @@ export default function MapView() {
     } else {
       map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
     }
-  }, [mapReady, layerVisibility, activeStateId]);
+  }, [mapReady, layerVisibility]);
 
   // ---- sync proposed scenarios (points + 3D campus) ----
-  // Only the active state's own scenarios are drawn — a site proposed in
-  // Washington shouldn't appear pinned on Minnesota's map after switching.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    const visibleScenarios = scenarios.filter((s) => s.stateId === activeStateId);
 
     const pointsFc: FeatureCollection = {
       type: "FeatureCollection",
-      features: visibleScenarios.map((s) => ({
+      features: scenarios.map((s) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [s.lng, s.lat] },
         properties: { label: s.label, id: s.id, active: s.id === activeScenarioId },
@@ -399,14 +409,14 @@ export default function MapView() {
     };
     const campusFc: FeatureCollection = {
       type: "FeatureCollection",
-      features: visibleScenarios.flatMap((s) => generateCampusFootprint(s).features),
+      features: scenarios.flatMap((s) => generateCampusFootprint(s).features),
     };
 
     const pointsSource = map.getSource("proposed-points") as maplibregl.GeoJSONSource | undefined;
     pointsSource?.setData(pointsFc);
     const campusSource = map.getSource("campus-buildings") as maplibregl.GeoJSONSource | undefined;
     campusSource?.setData(campusFc);
-  }, [mapReady, scenarios, activeScenarioId, activeStateId]);
+  }, [mapReady, scenarios, activeScenarioId]);
 
   // ---- click a proposed site marker to select it ----
   useEffect(() => {
@@ -429,7 +439,6 @@ export default function MapView() {
   // the `absolute` utility class and collapses this container to zero height.
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }
-
 
 function spiralFocusOnSite(
   map: maplibregl.Map,

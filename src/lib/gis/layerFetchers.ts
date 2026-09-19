@@ -1,24 +1,37 @@
-import { queryArcGisGeoJSON } from "./arcgis";
+import type { FeatureCollection } from "geojson";
+import { queryArcGisGeoJSON, type Bbox } from "./arcgis";
 import { TTL } from "@/lib/cache/memoryCache";
 import { WA_SOURCES } from "@/states/washington/sources";
 import { WA_EXISTING_DATA_CENTERS } from "@/states/washington/data/existingDataCenters";
 import {
-  fetchFloodZones,
-  fetchHydrographyRivers,
-  fetchHydrographyWaterbodies,
+  fetchNhdFlowline,
+  fetchNhdWaterbody,
+  fetchUsgsGauges,
+  fetchColocationFacilities,
+  fetchFemaFloodZones,
   fetchPopulationTracts,
-  generalizationFor,
-  makeColocationFacilitiesFetcher,
-  makeDataCentersFetcher,
-  makePowerPlantsFetcher,
-  makeUsgsGaugesFetcher,
-  withGracefulDegradation,
-} from "./nationalLayers";
-import type { Bbox, LayerFetcher } from "./types";
+  fetchEiaPowerPlants,
+  makeExistingDataCentersFetcher,
+} from "./nationalFetchers";
 
-export type { Bbox } from "./types";
+export type { Bbox };
+
+/**
+ * Geometry generalization tolerance (degrees), scaled to query width.
+ * A statewide query (~8° wide) gets generalized hard (huge polygon layers like
+ * FEMA flood zones and census tracts are multi-tens-of-MB at full resolution);
+ * a small analysis-radius query (a few tenths of a degree) stays effectively
+ * full-resolution, since exact-boundary precision matters there.
+ */
+function generalizationFor(bbox: Bbox): number {
+  const width = bbox[2] - bbox[0];
+  return Math.max(0.00005, width / 600);
+}
 
 // ---------------------------------------------------------------- POWER
+// Washington has its own dedicated BPA feed (line-level, better than the
+// nationwide HIFLD extract) — kept as-is rather than routed through the
+// shared national transmission fetcher other states use.
 
 async function fetchTransmissionLines(bbox: Bbox) {
   return queryArcGisGeoJSON(WA_SOURCES.bpaTransmission.url, {
@@ -50,6 +63,10 @@ async function fetchDroughtAreas(bbox: Bbox) {
 }
 
 // ----------------------------------------------------------- ENVIRONMENT
+// National Forest System boundaries (USFS) are no longer fetched as a layer —
+// forest cover is now shown via the CARTO basemap's own vector landcover
+// (see MapView.tsx's "forest-cover" effect), which reads better at every zoom
+// and isn't limited to federally-administered land.
 
 async function fetchStateHighways(bbox: Bbox) {
   return queryArcGisGeoJSON(
@@ -59,21 +76,23 @@ async function fetchStateHighways(bbox: Bbox) {
   );
 }
 
-const RAW_FETCHERS: Record<string, LayerFetcher<any>> = {
+// ----------------------------------------------------- EXISTING INFRA
+
+const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = {
   "transmission-lines": fetchTransmissionLines,
   "utility-territories": fetchUtilityTerritories,
-  "hydrography-rivers": fetchHydrographyRivers,
-  "hydrography-waterbodies": fetchHydrographyWaterbodies,
+  "hydrography-rivers": fetchNhdFlowline,
+  "hydrography-waterbodies": fetchNhdWaterbody,
   "water-diversions": fetchWaterDiversions,
   "instream-flow": fetchInstreamFlow,
   "drought-areas": fetchDroughtAreas,
-  "usgs-gauges": makeUsgsGaugesFetcher("WA"),
-  "colocation-facilities": makeColocationFacilitiesFetcher("WA"),
-  "flood-zones": fetchFloodZones,
+  "usgs-gauges": (bbox) => fetchUsgsGauges(bbox, "WA"),
+  "colocation-facilities": (bbox) => fetchColocationFacilities(bbox, "WA"),
+  "flood-zones": fetchFemaFloodZones,
   "state-highways": fetchStateHighways,
   "population-tracts": fetchPopulationTracts,
-  "data-centers": makeDataCentersFetcher("WA", WA_EXISTING_DATA_CENTERS),
-  "power-plants": makePowerPlantsFetcher("WA"),
+  "data-centers": makeExistingDataCentersFetcher("WA", WA_EXISTING_DATA_CENTERS),
+  "power-plants": (bbox) => fetchEiaPowerPlants(bbox, "WA"),
 };
 
 /**
@@ -83,4 +102,16 @@ const RAW_FETCHERS: Record<string, LayerFetcher<any>> = {
  * empty FeatureCollection as "unavailable" and label the corresponding metric UNKNOWN —
  * they never see the exception.
  */
-export const WA_LAYER_FETCHERS: Record<string, LayerFetcher<any>> = withGracefulDegradation(RAW_FETCHERS);
+export const WA_LAYER_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = Object.fromEntries(
+  Object.entries(RAW_FETCHERS).map(([layerId, fetcher]) => [
+    layerId,
+    async (bbox: Bbox): Promise<FeatureCollection> => {
+      try {
+        return await fetcher(bbox);
+      } catch (err) {
+        console.error(`[layer:${layerId}] fetch failed, treating as unavailable:`, err instanceof Error ? err.message : err);
+        return { type: "FeatureCollection", features: [] };
+      }
+    },
+  ])
+);

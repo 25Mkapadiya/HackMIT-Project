@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { getState } from "@/states/registry";
+import { getState, DEFAULT_STATE_ID } from "@/states/registry";
 
 function LegendSwatch({ color, kind, lineWidth }: { color: string; kind?: "line" | "fill" | "circle"; lineWidth?: number }) {
   if (kind === "circle")
@@ -22,8 +22,8 @@ export default function Legend() {
   const activeStateId = useAppStore((s) => s.activeStateId);
   const [collapsed, setCollapsed] = useState(false);
 
-  const stateLayers = getState(activeStateId)?.layers ?? [];
-  const visibleLayers = stateLayers.filter((l) => layerVisibility[l.id] && l.legend?.length);
+  const activeLayers = getState(activeStateId)?.layers ?? getState(DEFAULT_STATE_ID)!.layers;
+  const visibleLayers = activeLayers.filter((l) => layerVisibility[l.id] && l.legend?.length);
   if (visibleLayers.length === 0) return null;
 
   return (

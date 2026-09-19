@@ -1,20 +1,15 @@
 import type { LayerDefinition } from "@/lib/types";
-import { MN_SOURCES } from "./sources";
+import { OK_SOURCES } from "./sources";
 
 /**
- * Full layer registry for Minnesota — mirrors src/states/oklahoma/layers.ts
+ * Full layer registry for Oklahoma — mirrors src/states/washington/layers.ts
  * structure/layer ids exactly (so MapView, LayerControlPanel, Legend, and
- * popupContent.ts all work unmodified) but points at Minnesota-appropriate
- * sources: the shared nationwide HIFLD transmission mirror, Minnesota's own
- * MnGeo utility-territory and DNR hydrography services, and the shared U.S.
- * Drought Monitor. "substations", "broadband-coverage" and "protected-land"
- * are Minnesota-only bonus layers with no Washington/Oklahoma equivalent yet.
- *
- * No "water-diversions" or "state-highways" layers: no live public dataset
- * was found for MN water-appropriation permits (DNR's MPARS is login-gated)
- * or a statewide roads/functional-class service — see minnesota/layerFetchers.ts.
+ * popupContent.ts all work unmodified) but points at Oklahoma-appropriate
+ * sources: nationwide HIFLD/USGS/FEMA/Census/PeeringDB/EIA data reused as-is,
+ * plus Oklahoma-specific OWRB water-rights data. See src/lib/gis/nationalSources.ts
+ * and src/states/oklahoma/layerFetchers.ts for where each layer's data comes from.
  */
-export const MN_LAYERS: LayerDefinition[] = [
+export const OK_LAYERS: LayerDefinition[] = [
   // ---------------------------------------------------------------- POWER
   {
     id: "transmission-lines",
@@ -22,10 +17,10 @@ export const MN_LAYERS: LayerDefinition[] = [
     shortName: "Transmission",
     category: "power",
     geometryType: "line",
-    source: MN_SOURCES.hifldTransmission,
+    source: OK_SOURCES.hifldTransmission,
     confidence: "fact",
     description:
-      "HIFLD transmission line geometry and voltage class (nationwide extract, static — see source note). MnGeo's own official transmission-line dataset was withdrawn (Commerce could not keep it accurate), so this national mirror is used instead.",
+      "HIFLD transmission line geometry and voltage class (nationwide extract, static — see source note). Oklahoma is served primarily by OG&E, PSO, Western Farmers Electric Cooperative, and other cooperatives within the Southwest Power Pool (SPP).",
     defaultVisible: true,
     endpoint: "/api/gis/transmission-lines",
     legend: [
@@ -36,27 +31,15 @@ export const MN_LAYERS: LayerDefinition[] = [
     ],
   },
   {
-    id: "substations",
-    name: "Electric Substations",
-    category: "power",
-    geometryType: "point",
-    source: MN_SOURCES.substationsNational,
-    confidence: "fact",
-    description: "Substation locations (national HIFLD-schema mirror, filtered to MN). Available capacity/headroom is not public data — location only.",
-    defaultVisible: false,
-    endpoint: "/api/gis/substations",
-    color: "#c9722f",
-    legend: [{ label: "Substation", color: "#c9722f", swatch: "circle" }],
-  },
-  {
     id: "utility-territories",
-    name: "Electric Utility Service Areas",
+    name: "Electric Utility Retail Service Territories",
     shortName: "Utility Territories",
     category: "power",
     geometryType: "polygon",
-    source: MN_SOURCES.utilityServiceAreas,
-    confidence: "fact",
-    description: "MnGeo/PUC-sourced electric utility service-area boundaries (municipal, cooperative, investor-owned) — more current than a nationwide territories mirror.",
+    source: OK_SOURCES.hifldUtilityTerritories,
+    confidence: "proxy",
+    description:
+      "HIFLD electric retail service territory boundaries (static 2025-08-21 snapshot). Informational — not an official service determination and will not reflect subsequent changes.",
     defaultVisible: false,
     endpoint: "/api/gis/utility-territories",
     color: "#5b7a9d",
@@ -69,9 +52,9 @@ export const MN_LAYERS: LayerDefinition[] = [
     name: "Rivers & Streams",
     category: "water",
     geometryType: "line",
-    source: MN_SOURCES.dnrPublicWatersLines,
+    source: OK_SOURCES.usgsNhdFlowline,
     confidence: "fact",
-    description: "Minnesota DNR Public Waters Inventory — statutorily designated watercourses.",
+    description: "USGS National Hydrography Dataset flowlines (small-scale). Includes the Arkansas, Red, and Canadian river systems.",
     defaultVisible: true,
     endpoint: "/api/gis/hydrography-rivers",
     color: "#3ba9f2",
@@ -79,23 +62,24 @@ export const MN_LAYERS: LayerDefinition[] = [
   },
   {
     id: "hydrography-waterbodies",
-    name: "Lakes & Wetlands",
+    name: "Water Bodies (Lakes & Reservoirs)",
+    shortName: "Water Bodies",
     category: "water",
     geometryType: "polygon",
-    source: MN_SOURCES.dnrPublicWatersBasins,
+    source: OK_SOURCES.usgsNhdWaterbody,
     confidence: "fact",
-    description: "Minnesota DNR Public Waters Inventory — statutorily designated lake/wetland basins.",
+    description: "USGS National Hydrography Dataset waterbody polygons (small-scale), including major reservoirs like Grand Lake and Eufaula Lake.",
     defaultVisible: true,
     endpoint: "/api/gis/hydrography-waterbodies",
     color: "#1f6fa8",
-    legend: [{ label: "Lake / wetland", color: "#1f6fa8", swatch: "fill" }],
+    legend: [{ label: "Lake / reservoir", color: "#1f6fa8", swatch: "fill" }],
   },
   {
     id: "usgs-gauges",
     name: "USGS Streamflow Gauges",
     category: "water",
     geometryType: "point",
-    source: MN_SOURCES.usgsNwisGauges,
+    source: OK_SOURCES.usgsNwisGauges,
     confidence: "fact",
     description: "Active USGS surface-water monitoring stations with current discharge readings.",
     defaultVisible: false,
@@ -104,12 +88,26 @@ export const MN_LAYERS: LayerDefinition[] = [
     legend: [{ label: "Active gauge", color: "#63d4ff", swatch: "circle" }],
   },
   {
+    id: "water-diversions",
+    name: "Water Right Permits (Surface + Groundwater)",
+    shortName: "Water Rights",
+    category: "water",
+    geometryType: "point",
+    source: OK_SOURCES.owrbSurfaceWaterRights,
+    confidence: "fact",
+    description: "Permitted surface-water diversion points and groundwater wells (Oklahoma Water Resources Board Water Rights Database).",
+    defaultVisible: false,
+    endpoint: "/api/gis/water-diversions",
+    color: "#2ee6c8",
+    legend: [{ label: "Permitted water right", color: "#2ee6c8", swatch: "circle" }],
+  },
+  {
     id: "drought-areas",
     name: "U.S. Drought Monitor — Current Conditions",
     shortName: "Drought",
     category: "water",
     geometryType: "polygon",
-    source: MN_SOURCES.usDroughtMonitor,
+    source: OK_SOURCES.usDroughtMonitor,
     confidence: "fact",
     description: "Current weekly drought classification (D0 abnormally dry through D4 exceptional drought), released Thursdays by NDMC/NOAA/USDA.",
     defaultVisible: false,
@@ -129,27 +127,14 @@ export const MN_LAYERS: LayerDefinition[] = [
     shortName: "Colo Facilities",
     category: "connectivity",
     geometryType: "point",
-    source: MN_SOURCES.peeringDb,
+    source: OK_SOURCES.peeringDb,
     confidence: "fact",
-    description: "PeeringDB-listed carrier hotels and colocation facilities — a proxy for interconnection density, not a survey of long-haul fiber routes.",
+    description:
+      "PeeringDB-listed carrier hotels and colocation facilities — a proxy for interconnection density, not a survey of long-haul fiber routes or the Oklahoma Broadband Map's retail coverage data.",
     defaultVisible: true,
     endpoint: "/api/gis/colocation-facilities",
     color: "#9b6ef2",
     legend: [{ label: "Colocation / IX facility", color: "#9b6ef2", swatch: "circle" }],
-  },
-  {
-    id: "broadband-coverage",
-    name: "Fiber Broadband Coverage",
-    shortName: "Fiber Coverage",
-    category: "connectivity",
-    geometryType: "polygon",
-    source: MN_SOURCES.deedBroadbandFiber,
-    confidence: "proxy",
-    description: "MN DEED / Connected Nation fiber-technology coverage areas — a coarse dissolved-polygon proxy, not address-level or long-haul route data.",
-    defaultVisible: false,
-    endpoint: "/api/gis/broadband-coverage",
-    color: "#6ed4c8",
-    legend: [{ label: "Fiber coverage area (proxy)", color: "#6ed4c8", swatch: "fill" }],
   },
 
   // ----------------------------------------------------------- ENVIRONMENT
@@ -159,9 +144,9 @@ export const MN_LAYERS: LayerDefinition[] = [
     shortName: "Flood Zones",
     category: "environment",
     geometryType: "polygon",
-    source: MN_SOURCES.femaNfhl,
+    source: OK_SOURCES.femaNfhl,
     confidence: "fact",
-    description: "Effective FEMA National Flood Hazard Layer zones, where mapped.",
+    description: "Effective FEMA National Flood Hazard Layer zones, where mapped. Arkansas River, Red River, and Canadian River corridors are priority areas to check.",
     defaultVisible: false,
     endpoint: "/api/gis/flood-zones",
     color: "#e0524a",
@@ -171,28 +156,15 @@ export const MN_LAYERS: LayerDefinition[] = [
     ],
   },
   {
-    id: "protected-land",
-    name: "Conservation Easements (RIM Reserve)",
-    shortName: "Conservation Land",
-    category: "environment",
-    geometryType: "polygon",
-    source: MN_SOURCES.bwsrConservationEasements,
-    confidence: "fact",
-    description: "State-funded perpetual conservation easements (MN Board of Water & Soil Resources).",
-    defaultVisible: false,
-    endpoint: "/api/gis/protected-land",
-    color: "#4fae6a",
-    legend: [{ label: "Conservation easement", color: "#4fae6a", swatch: "fill" }],
-  },
-  {
     id: "forest-cover",
     name: "Forest / Tree Canopy",
     shortName: "Forests",
     category: "environment",
     geometryType: "raster",
-    source: MN_SOURCES.cartoForestCover,
+    source: OK_SOURCES.cartoForestCover,
     confidence: "proxy",
-    description: "Visual forest/wood land-cover polygons from the CARTO basemap's OpenStreetMap-derived landcover layer (e.g. Superior and Chippewa National Forests, and non-federal woodland alike). Optimized for clear map reading; not an authoritative forestry inventory.",
+    description:
+      "Visual forest/wood land-cover polygons from the CARTO basemap's OpenStreetMap-derived landcover layer (e.g. Ouachita National Forest, Black Kettle National Grassland, and non-federal woodland alike). Optimized for clear map reading; not an authoritative forestry inventory.",
     defaultVisible: false,
     color: "#4f7f50",
     legend: [{ label: "Tree canopy / forest cover", color: "#4f7f50", swatch: "fill" }],
@@ -203,9 +175,10 @@ export const MN_LAYERS: LayerDefinition[] = [
     shortName: "Terrain",
     category: "environment",
     geometryType: "raster",
-    source: MN_SOURCES.usgsShadedRelief,
+    source: OK_SOURCES.usgsShadedRelief,
     confidence: "fact",
-    description: "USGS The National Map cached shaded relief, derived from 3DEP at large and medium scales. Rendered as a subtle flat overlay for terrain context.",
+    description:
+      "USGS The National Map cached shaded relief, derived from 3DEP at large and medium scales. Rendered as a subtle flat overlay for terrain context.",
     defaultVisible: false,
     color: "#8d8a82",
     legend: [{ label: "Shaded terrain relief", color: "#8d8a82", swatch: "fill" }],
@@ -217,7 +190,7 @@ export const MN_LAYERS: LayerDefinition[] = [
     name: "Census Tract Boundaries",
     category: "community",
     geometryType: "polygon",
-    source: MN_SOURCES.censusTiger,
+    source: OK_SOURCES.censusTiger,
     confidence: "fact",
     description: "US Census tract boundaries, used for population-proximity estimates.",
     defaultVisible: false,
@@ -233,9 +206,10 @@ export const MN_LAYERS: LayerDefinition[] = [
     shortName: "Generation",
     category: "existing_infrastructure",
     geometryType: "point",
-    source: MN_SOURCES.eia,
+    source: OK_SOURCES.eia,
     confidence: "unknown",
-    description: "Nearby generating facilities from EIA. Requires a server-side EIA_API_KEY — shown as unavailable until configured.",
+    description:
+      "Nearby generating facilities from EIA. Oklahoma has substantial wind and natural-gas generation. Requires a server-side EIA_API_KEY — shown as unavailable until configured.",
     defaultVisible: true,
     endpoint: "/api/gis/power-plants",
     color: "#f2b93b",
@@ -243,20 +217,20 @@ export const MN_LAYERS: LayerDefinition[] = [
   },
   {
     id: "data-centers",
-    name: "Known Data Center Campuses",
+    name: "Known / Announced Data Center Campuses",
     shortName: "Data Centers",
     category: "existing_infrastructure",
     geometryType: "point",
-    source: MN_SOURCES.curatedDataCenters,
-    confidence: "unknown",
-    description: "No verified, geolocated Minnesota data center facilities have been catalogued yet.",
+    source: OK_SOURCES.curatedDataCenters,
+    confidence: "proxy",
+    description: "Hand-curated, illustrative list of publicly reported Oklahoma data center campuses/projects. Not exhaustive.",
     defaultVisible: true,
     endpoint: "/api/gis/data-centers",
     color: "#8fa3bf",
-    legend: [{ label: "Existing data center campus", color: "#8fa3bf", swatch: "circle" }],
+    legend: [{ label: "Existing / announced data center campus", color: "#8fa3bf", swatch: "circle" }],
   },
 ];
 
-export function getMnLayer(id: string): LayerDefinition | undefined {
-  return MN_LAYERS.find((l) => l.id === id);
+export function getOkLayer(id: string): LayerDefinition | undefined {
+  return OK_LAYERS.find((l) => l.id === id);
 }

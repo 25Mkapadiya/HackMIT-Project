@@ -72,9 +72,9 @@ export interface RedundancyAssumption {
 
 export interface ScenarioConfig {
   id: string;
-  /** Which StateDefinition's analysis pipeline this scenario runs against (registry.ts `id`, e.g. "washington"). */
-  stateId: string;
   label: string;
+  /** Which StateDefinition's GIS sources/fetchers to run analysis against. */
+  stateId: string;
   lng: number;
   lat: number;
   mwLoad: number;

@@ -1,6 +1,9 @@
 import type { StateDefinition } from "@/lib/types";
 import { MN_LAYERS } from "./layers";
 
+// Bounds/center match the real Census-derived entry in src/states/directory.ts
+// (id "mn") — duplicated here as literals (like WASHINGTON/OKLAHOMA do) so this
+// file has no import-order dependency on the generated directory.
 export const MINNESOTA: StateDefinition = {
   id: "minnesota",
   name: "Minnesota",

@@ -1,7 +1,12 @@
 import type { FeatureCollection, Point } from "geojson";
-import type { DataCenterProps } from "@/lib/gis/nationalLayers";
 
-export type { DataCenterProps };
+export interface DataCenterProps {
+  name: string;
+  operator: string;
+  city: string;
+  approxCriticalMw: number | null;
+  notes: string;
+}
 
 /**
  * Hand-curated, illustrative list of publicly reported major WA data center campuses.
