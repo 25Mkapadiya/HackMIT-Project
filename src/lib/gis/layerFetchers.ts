@@ -10,6 +10,7 @@ import {
   fetchColocationFacilities,
   fetchFemaFloodZones,
   fetchPopulationTracts,
+  fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
 } from "./nationalFetchers";
 
@@ -101,6 +102,7 @@ const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> =
   "flood-zones": fetchFemaFloodZones,
   "state-highways": fetchStateHighways,
   "population-tracts": fetchPopulationTracts,
+  "population-density": fetchCountyPopulationDensity,
   "data-centers": fetchDataCenters,
   "power-plants": (bbox) => fetchEiaPowerPlants(bbox, "WA"),
 };

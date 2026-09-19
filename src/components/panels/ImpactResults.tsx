@@ -51,6 +51,14 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
           }}
         />
         <MetricRow metric={power.gridCapacity} />
+        <MetricRow
+          metric={{
+            ...power.gridDemandPressure,
+            value: power.gridDemandPressure.value
+              ? `${power.gridDemandPressure.demandPressureLabel} (${power.gridDemandPressure.value.countyName ?? "county"}, ~${Math.round(power.gridDemandPressure.value.densityPerSqMi ?? 0).toLocaleString()}/sq mi)`
+              : null,
+          }}
+        />
         <MetricRow metric={power.likelyAction} />
       </Section>
 

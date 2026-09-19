@@ -7,6 +7,7 @@ import {
   fetchColocationFacilities,
   fetchFemaFloodZones,
   fetchPopulationTracts,
+  fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
   fetchHifldTransmissionLines,
   fetchHifldUtilityTerritories,
@@ -61,6 +62,7 @@ const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> =
   "colocation-facilities": (bbox) => fetchColocationFacilities(bbox, "OK"),
   "flood-zones": fetchFemaFloodZones,
   "population-tracts": fetchPopulationTracts,
+  "population-density": fetchCountyPopulationDensity,
   "data-centers": fetchDataCenters,
   "power-plants": (bbox) => fetchEiaPowerPlants(bbox, "OK"),
   // No "state-highways" entry: no verified Oklahoma road-classification GIS

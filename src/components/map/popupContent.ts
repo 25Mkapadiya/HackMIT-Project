@@ -52,6 +52,19 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
       ]);
     case "population-tracts":
       return wrap("Census Tract", [["Tract", (props.NAME as string) || (props.GEOID as string)]]);
+    case "population-density":
+      return wrap("County Population Density", [
+        ["County", (props.CountyName as string) || "Unknown"],
+        ["State", props.State as string],
+        ["Population", props.Population ? (props.Population as number).toLocaleString() : "Unavailable"],
+        ["Land area", props.LandAreaSqMi ? `${(props.LandAreaSqMi as number).toLocaleString()} sq mi` : "Unavailable"],
+        [
+          "Density",
+          props.PopulationDensityPerSqMi
+            ? `${Math.round(props.PopulationDensityPerSqMi as number).toLocaleString()} / sq mi`
+            : "Unavailable",
+        ],
+      ]);
     case "power-plants":
       return wrap("Power Generation Facility", [
         ["Plant", props.plantName as string],

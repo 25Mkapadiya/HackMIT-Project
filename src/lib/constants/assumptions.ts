@@ -91,3 +91,17 @@ export const VOLTAGE_TIERS = {
   high: 230,
   extraHigh: 500,
 };
+
+/**
+ * County population-density thresholds (people/sq mi, US Census Bureau PEP +
+ * Gazetteer) used to bucket "existing grid demand pressure" near a site — a
+ * rough proxy for how much residential/commercial load already competes for
+ * headroom on the local transmission/distribution system, not a substitute
+ * for a utility interconnection study.
+ */
+export const POPULATION_DENSITY_TIERS = {
+  low: 25, // below this: rural, minimal competing local load
+  moderate: 150, // suburban
+  high: 1000, // urban
+  // 1000+/sq mi: dense urban
+};

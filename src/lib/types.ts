@@ -104,6 +104,8 @@ export interface DistanceResult {
   source: SourceMeta;
 }
 
+export type DemandPressureLabel = "Low" | "Moderate" | "High" | "Very High" | "Unknown";
+
 export interface PowerAnalysis {
   facilityRequirementMw: number;
   nearestTransmission: DistanceResult & { voltageKv: number | null };
@@ -115,6 +117,17 @@ export interface PowerAnalysis {
     { totalMw: number; count: number; plants: { name: string; mw: number; fuel: string; miles: number }[] } | null
   >;
   gridCapacity: Metric<string>;
+  /**
+   * County-level population density near the site (Census PEP + Gazetteer, see
+   * scripts/county_population_density.py), used as a proxy for how much existing
+   * residential/commercial load is already drawing on the same transmission and
+   * distribution infrastructure — denser counties tend to leave less available
+   * headroom on a given line for a new large load, even at a high voltage tier.
+   * Not a substitute for a formal interconnection study.
+   */
+  gridDemandPressure: Metric<{ countyName: string | null; densityPerSqMi: number | null } | null> & {
+    demandPressureLabel: DemandPressureLabel;
+  };
   likelyAction: Metric<string>;
 }
 

@@ -110,6 +110,15 @@ export const WA_SOURCES = {
     refreshFrequency: "Live ArcGIS MapServer",
     methodology: "Current tract boundaries queried by bounding box.",
   },
+  censusCountyDensity: {
+    id: "census-county-population-density",
+    name: "US Census Bureau — County Population Density (PEP + Gazetteer)",
+    url: "https://www2.census.gov/programs-surveys/popest/datasets/",
+    license: "Public domain (US Census Bureau)",
+    refreshFrequency: "Annual (Population Estimates Program vintage; land area from the Census Gazetteer)",
+    methodology:
+      "County population (Census Bureau Population Estimates Program, most recent published vintage) divided by land area (Census Gazetteer ALAND_SQMI) to give people per square mile, joined to live TIGERweb county boundaries by GEOID.",
+  },
   eia: {
     id: "eia-v2",
     name: "US Energy Information Administration — Open Data API v2",

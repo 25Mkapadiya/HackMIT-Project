@@ -180,6 +180,25 @@ export const MS_LAYERS: LayerDefinition[] = [
     color: "#6b7f99",
     legend: [{ label: "Census tract boundary", color: "#6b7f99", swatch: "line" }],
   },
+  {
+    id: "population-density",
+    name: "County Population Density",
+    shortName: "Pop. Density",
+    category: "community",
+    geometryType: "polygon",
+    source: MS_SOURCES.censusCountyDensity,
+    confidence: "estimated",
+    description:
+      "County-level population density (people per sq mi), combining Census Population Estimates with Gazetteer land area. Denser counties tend to carry more existing residential/commercial load on the local grid, competing with a new large facility for available transmission and substation headroom.",
+    defaultVisible: false,
+    endpoint: "/api/gis/population-density",
+    legend: [
+      { label: "< 25 / sq mi (rural)", color: "#d8e6f2", swatch: "fill" },
+      { label: "25–150 / sq mi (suburban)", color: "#9dc3e6", swatch: "fill" },
+      { label: "150–1,000 / sq mi (urban)", color: "#4f81bd", swatch: "fill" },
+      { label: "1,000+ / sq mi (dense urban)", color: "#1f3864", swatch: "fill" },
+    ],
+  },
 
   // ----------------------------------------------------- EXISTING INFRA
   {

@@ -6,7 +6,7 @@ import type {
   RegulationAnalysis,
   WaterAnalysis,
 } from "@/lib/types";
-import { TRANSMISSION_PROXIMITY_BANDS } from "@/lib/constants/assumptions";
+import { TRANSMISSION_PROXIMITY_BANDS, VOLTAGE_TIERS } from "@/lib/constants/assumptions";
 
 /**
  * Synthesizes plain-language infrastructure gaps from the sequential analysis output.
@@ -52,6 +52,18 @@ export function synthesizeGaps(
     summary: "Interconnection study required to confirm available capacity.",
     detail: "Transmission proximity does not indicate available substation/feeder headroom. A formal interconnection study with the serving utility or transmission operator is the standard next step for a facility of this size.",
   });
+
+  const demandPressure = power.gridDemandPressure.demandPressureLabel;
+  const densityInfo = power.gridDemandPressure.value;
+  if ((demandPressure === "High" || demandPressure === "Very High") && densityInfo) {
+    const nearestKvValue = power.nearest230kv.voltageKv;
+    gaps.push({
+      category: "power",
+      severity: demandPressure === "Very High" && (nearestKvValue == null || nearestKvValue < VOLTAGE_TIERS.high) ? "watch" : "info",
+      summary: `${densityInfo.countyName ?? "This county"} has ${demandPressure.toLowerCase()} existing population density (~${Math.round(densityInfo.densityPerSqMi ?? 0).toLocaleString()}/sq mi).`,
+      detail: "Denser counties tend to carry more existing residential/commercial load on the same transmission and distribution system, which can leave less available headroom for a new large facility even where a high-voltage line is nearby. Weight this alongside the interconnection study, not as a substitute for it.",
+    });
+  }
 
   if (fiber.nearestIxp.distanceMiles == null || fiber.nearestIxp.distanceMiles > 25) {
     gaps.push({
