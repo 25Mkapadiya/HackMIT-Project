@@ -187,7 +187,11 @@ export async function fetchHifldTransmissionLines(bbox: Bbox): Promise<FeatureCo
     type: "FeatureCollection",
     features: fc.features.map((f) => {
       const p = f.properties ?? {};
-      const voltage = typeof p.voltage === "number" ? p.voltage : Number(p.voltage) || null;
+      const rawVoltage = typeof p.voltage === "number" ? p.voltage : Number(p.voltage) || null;
+      // HIFLD uses -999999 (and similar large negative sentinels) for "unknown
+      // voltage" rather than a null value — treat any non-positive reading as
+      // unknown so it never gets displayed or compared against as a real kV figure.
+      const voltage = rawVoltage != null && rawVoltage > 0 ? rawVoltage : null;
       return {
         ...f,
         properties: {
