@@ -27,6 +27,8 @@ import { NC_LAYER_FETCHERS } from "@/states/northcarolina/layerFetchers";
 import { NC_SOURCES } from "@/states/northcarolina/sources";
 import { VA_LAYER_FETCHERS } from "@/states/virginia/layerFetchers";
 import { VA_SOURCES } from "@/states/virginia/sources";
+import { IL_LAYER_FETCHERS } from "@/states/illinois/layerFetchers";
+import { IL_SOURCES } from "@/states/illinois/sources";
 import { MO_LAYER_FETCHERS } from "@/states/missouri/layerFetchers";
 import { MO_SOURCES } from "@/states/missouri/sources";
 
@@ -366,6 +368,26 @@ const MISSOURI_BUNDLE = buildStandardBundle({
       name: "Missouri data-center siting — general regulatory context",
       url: "https://ded.mo.gov/",
       methodology: "General state/local regulatory context; not a jurisdiction-specific legal determination or utility capacity finding.",
+    },
+  },
+});
+
+
+const ILLINOIS_BUNDLE = buildStandardBundle({
+  fetchers: IL_LAYER_FETCHERS,
+  hifldTransmission: IL_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: IL_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: IL_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO/PJM",
+  environmentalReviewNote:
+    "Illinois has no statewide zoning layer, so municipality/county land-use review remains site-specific. Illinois also spans both MISO and PJM planning regions, and large-load service must be coordinated with the serving utility and applicable regional transmission organization. Data-center incentive policy is under active review in 2026.",
+  permittingNote: {
+    text: "Large facilities in Illinois typically require municipal or county zoning/site-plan review plus large-load coordination with the serving utility (such as ComEd, Ameren Illinois, MidAmerican Energy, a municipal utility, or a cooperative) and the applicable MISO or PJM process. Illinois Data Center Investment Program processing for new agreements was paused beginning July 1, 2026 while policy reforms are considered. Utility interconnection is separate from land-use permitting.",
+    source: {
+      id: "il-permitting-general",
+      name: "Illinois data-center siting — general regulatory context",
+      url: "https://dceo.illinois.gov/expandrelocate/incentives/datacenters.html",
+      methodology: "General statewide regulatory context from Illinois public sources; not a jurisdiction-specific legal determination.",
     },
   },
 });
