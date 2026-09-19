@@ -1,0 +1,14 @@
+{
+  "EIA-860": "The U.S. Energy Information Administration's annual survey of every power plant 1MW or larger in the country — location, capacity, fuel type, ownership. This app uses the 2025 edition.",
+  "nameplate capacity": "The maximum power a generator is rated to produce under ideal conditions, in megawatts (MW). It's a ceiling, not what the plant produces on average — a solar plant's nameplate MW, for instance, only happens at solar noon on a clear day.",
+  "grid voltage": "The voltage a plant is wired into, in kilovolts (kV). Higher voltage (230kV+) means long-distance, high-capacity transmission lines, not just local delivery wires — it's a rough signal of how much power a connection point can move.",
+  "substation headroom": "How much additional load a substation can actually accept before it needs upgrades. This is the single most important number for a real siting decision — and it's legally non-public (see CEII).",
+  "CEII": "Critical Energy Infrastructure Information — a federal designation (18 CFR 388.113) that keeps detailed grid-capacity data out of the public domain, for security reasons. It's why this tool has to estimate power access instead of looking it up.",
+  "interconnection": "The physical and contractual process of connecting a new electricity user (or generator) to the grid. \"Grid-tied\" draws power from the shared grid; \"self-generated\" means the facility brings its own power plant.",
+  "curtailment": "When a grid operator orders a large customer to temporarily reduce its power draw — usually during high demand — to keep the grid stable.",
+  "SB6": "Texas Senate Bill 6 (2025) — requires large electricity users (≥75MW) to register with ERCOT and follow statewide interconnection and curtailment rules.",
+  "ERCOT": "The Electric Reliability Council of Texas — runs the power grid for about 90% of the state. It's electrically isolated from the rest of the US grid, which limits Texas's ability to import power during a shortage.",
+  "WUE": "Water Usage Effectiveness — liters of water used per kilowatt-hour of IT power delivered. Lower is more water-efficient; it depends heavily on the cooling method.",
+  "evaporative cooling": "A cooling method that uses water evaporation to remove heat. It's cheap and energy-efficient but consumes far more water than air or liquid closed-loop cooling.",
+  "moratorium": "A temporary, formal halt on new development or permitting in a given area, usually passed by a local government."
+}

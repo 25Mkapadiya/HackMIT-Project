@@ -20,47 +20,28 @@ export type CountyCollection = FeatureCollection<Geometry, CountyProps>;
 export type StateFeature = Feature<Geometry, StateProps>;
 export type StateCollection = FeatureCollection<Geometry, StateProps>;
 
-export interface GridHub {
+export interface PowerPlantProps {
+  plant_code: number;
   name: string;
   state: string;
-  lat: number;
-  lon: number;
-  tier: 1 | 2;
+  county: string | null;
+  utility: string | null;
+  balancing_authority: string | null;
+  nameplate_mw: number;
+  max_grid_voltage_kv: number | null;
+  technologies: string[];
 }
+
+export type PowerPlantFeature = Feature<Geometry, PowerPlantProps>;
+export type PowerPlantCollection = FeatureCollection<Geometry, PowerPlantProps>;
 
 export type Interconnect = "grid-tied" | "self-generated";
 export type Cooling = "air" | "evaporative" | "liquid";
-
-export interface Weights {
-  grid: number;
-  carbon: number;
-  land: number;
-  demand: number;
-}
 
 export interface ScenarioInputs {
   loadMW: number;
   interconnect: Interconnect;
   cooling: Cooling;
-  weights: Weights;
-}
-
-export interface Placement {
-  id: string;
-  stateFips: string;
-  countyFips: string;
-  countyName: string;
-  loadMW: number;
-  interconnect: Interconnect;
-  cooling: Cooling;
-  score: number;
-  tier: Tier;
-}
-
-export interface StateMeters {
-  headroom: number;
-  water: number;
-  approval: number;
 }
 
 export type Tier = "good" | "caution" | "major" | "bad";
@@ -70,21 +51,56 @@ export interface TierInfo {
   cls: Tier;
 }
 
-export interface CountyScore {
-  fips: string;
-  name: string;
-  statePostal: string | null;
+/** A plain-language note, optionally carrying glossary term keys the UI
+ * renders as inline "ⓘ term" chips next to the sentence that uses them. */
+export interface Note {
+  text: string;
+  terms: string[];
+}
+
+export interface GateResult {
+  key: "power" | "fiber" | "regulatory" | "water" | "land";
+  label: string;
+  pass: boolean;
   blocked: boolean;
-  paused: boolean;
-  substationAdjacent: boolean;
+  score?: number;
+  capScore?: number;
+  reason?: Note;
+  notes: Note[];
+  galPerDay?: number;
+}
+
+/** Result of running a lat/lng through the full sequential gate pipeline. */
+export interface SiteEvaluation {
+  lat: number;
+  lng: number;
+  countyFips: string | null;
+  statePostal: string | null;
+  name: string;
+  blocked: boolean;
+  blockingGate?: string;
+  reason?: Note;
   score: number;
   tier: TierInfo;
-  breakdown: {
-    grid: number;
-    carbon: number;
-    land: number;
-    demand: number;
-  };
-  nearestHub: { name: string; distanceKm: number } | null;
-  notes: string[];
+  gates: GateResult[];
+}
+
+export interface Placement {
+  id: string;
+  stateFips: string;
+  lat: number;
+  lng: number;
+  name: string;
+  loadMW: number;
+  interconnect: Interconnect;
+  cooling: Cooling;
+  score: number;
+  tier: Tier;
+  galPerDay: number;
+}
+
+export interface StateMeters {
+  headroom: number;
+  water: number;
+  approval: number;
 }

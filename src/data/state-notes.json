@@ -1,15 +1,18 @@
 {
-  "_source": "Texas entries are grounded in real, named 2025-2026 developments cited in the project brief (SB6, the Aug 2026 grid-tied interconnection pause, Fort Worth/San Antonio application pauses, Hill County's moratorium, Hood County's two rejections). Entries for every other state are a generic placeholder — no state-specific regulatory dataset is modeled yet for them. See README for how to extend this per state.",
+  "_source": "Texas entries are real, named facts from 2025-2026 developments cited in the project research brief (SB6, the Aug 2026 grid-tied interconnection pause, Fort Worth/San Antonio application pauses, Hill County's moratorium, Hood County's two rejections, plus informational 'notable' context on Ector/Harris/Collin/Nueces). Entries for every other state are a placeholder — no state-specific regulatory dataset is modeled yet for them. See README for how to extend this per state.",
   "TX": {
-    "sb6Threshold": true,
-    "gridTiedPauseNote": "Gov. Abbott's Aug 2026 order pauses new grid-tied interconnections pending audit — self-generated facilities are exempt.",
+    "gridTiedPauseNote": "Gov. Abbott's Aug 2026 order pauses new grid-tied interconnections pending audit — this cap lifts once the audit clears, or switch to self-generated.",
     "counties": {
       "Tarrant": { "status": "paused", "reason": "Fort Worth has paused new datacenter applications." },
       "Hood": { "status": "blocked", "reason": "Hood County rejected two prior siting attempts." },
       "Hill": { "status": "blocked", "reason": "Hill County passed a moratorium on new datacenter development." },
       "Travis": { "status": "blocked", "reason": "Residential buffer zone — too close to dense residential development." },
       "Hays": { "status": "blocked", "reason": "Edwards Aquifer recharge zone — protected from new impervious development." },
-      "Bexar": { "status": "paused", "reason": "San Antonio has paused new datacenter applications." }
+      "Bexar": { "status": "paused", "reason": "San Antonio has paused new datacenter applications." },
+      "Ector": { "status": "notable", "reason": "Dense transmission buildout serving Permian Basin oil & gas load." },
+      "Harris": { "status": "notable", "reason": "Ship-channel industrial corridor — heavy existing interconnection capacity." },
+      "Collin": { "status": "notable", "reason": "North Texas transmission-dense corridor." },
+      "Nueces": { "status": "notable", "reason": "South Texas energy corridor, strong wind generation nearby." }
     }
   }
 }
