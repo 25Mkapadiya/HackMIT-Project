@@ -161,8 +161,8 @@ export default function MapView() {
 
     async function syncLayers() {
       for (const layer of WASHINGTON.layers) {
-        // Terrain uses a raster-dem source loaded directly by MapLibre, not the GeoJSON API.
-        if (layer.id === "terrain-hillshade") continue;
+        // Visual raster layers are loaded directly by MapLibre rather than through the GeoJSON API.
+        if (layer.geometryType === "raster") continue;
         const wantVisible = Boolean(layerVisibility[layer.id]);
         const sourceId = `src-${layer.id}`;
 
@@ -202,49 +202,96 @@ export default function MapView() {
     syncLayers();
   }, [mapReady, layerVisibility]);
 
-  // ---- terrain / mountains (public Mapzen Terrain Tiles on AWS) ----
+  // ---- U.S. cartographic forest cover ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    const visible = Boolean(layerVisibility["terrain-hillshade"]);
-    const sourceId = "terrain-dem";
-    const hillshadeId = "terrain-hillshade-map";
+    const visible = Boolean(layerVisibility["forest-cover"]);
+    const sourceId = "forest-canopy-raster";
+    const layerId = "forest-cover-raster";
 
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
-        type: "raster-dem",
-        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        type: "raster",
+        tiles: [
+          "https://tiles.arcgis.com/tiles/9lDFdeC4JIBgML6L/arcgis/rest/services/Tree_Canopy_Cover/MapServer/tile/{z}/{y}/{x}",
+        ],
         tileSize: 256,
-        maxzoom: 15,
-        encoding: "terrarium",
-        attribution: "Terrain Tiles © Mapzen / Tilezen contributors",
+        minzoom: 4,
+        maxzoom: 13,
+        attribution: "Tree canopy © USDA Forest Service",
       });
     }
 
-    if (!map.getLayer(hillshadeId)) {
+    if (!map.getLayer(layerId)) {
       map.addLayer(
         {
-          id: hillshadeId,
-          type: "hillshade",
+          id: layerId,
+          type: "raster",
           source: sourceId,
+          minzoom: 4,
           paint: {
-            "hillshade-exaggeration": 0.5,
-            "hillshade-shadow-color": "#10151b",
-            "hillshade-highlight-color": "#d8d1c2",
-            "hillshade-accent-color": "#7b7469",
+            "raster-opacity": 0.46,
+            "raster-resampling": "linear",
+            "raster-fade-duration": 180,
+            "raster-saturation": -0.08,
+            "raster-contrast": 0.08,
+            "raster-brightness-min": 0.08,
+            "raster-brightness-max": 0.86,
           },
           layout: { visibility: visible ? "visible" : "none" },
         },
         "proposed-points-glow"
       );
     } else {
-      map.setLayoutProperty(hillshadeId, "visibility", visible ? "visible" : "none");
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    }
+  }, [mapReady, layerVisibility]);
+
+  // ---- U.S.-only terrain / mountains: subtle USGS 3DEP multidirectional relief ----
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const visible = Boolean(layerVisibility["terrain-hillshade"]);
+    const sourceId = "usgs-3dep-relief";
+    const layerId = "terrain-relief-raster";
+
+    // Make sure the previous global 3D terrain state can never leak through after hot reloads.
+    if (map.getTerrain()) map.setTerrain(null);
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "raster",
+        tiles: ["/api/tiles/terrain/{z}/{x}/{y}"],
+        tileSize: 256,
+        minzoom: 4,
+        maxzoom: 15,
+        attribution: "Terrain © USGS 3D Elevation Program",
+      });
     }
 
-    if (visible) {
-      map.setTerrain({ source: sourceId, exaggeration: 1.15 });
-    } else if (map.getTerrain()) {
-      map.setTerrain(null);
+    if (!map.getLayer(layerId)) {
+      map.addLayer(
+        {
+          id: layerId,
+          type: "raster",
+          source: sourceId,
+          minzoom: 4,
+          paint: {
+            "raster-opacity": 0.28,
+            "raster-resampling": "linear",
+            "raster-fade-duration": 160,
+            "raster-saturation": -1,
+            "raster-contrast": 0.04,
+            "raster-brightness-min": 0.18,
+            "raster-brightness-max": 0.88,
+          },
+          layout: { visibility: visible ? "visible" : "none" },
+        },
+        "proposed-points-glow"
+      );
+    } else {
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
     }
   }, [mapReady, layerVisibility]);
 
