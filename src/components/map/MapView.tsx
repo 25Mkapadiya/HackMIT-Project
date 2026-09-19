@@ -470,19 +470,59 @@ export default function MapView() {
     async function syncLayers() {
       const tasks: Array<Promise<void>> = [];
 
-      for (const state of states) {
-        for (const layer of state.layers) {
-          if (layer.geometryType === "raster") continue;
-          const wantVisible = Boolean(layerVisibility[layer.id]);
-          const key = `${state.id}:${layer.id}`;
+      // In Show All mode, wait for the background data preload. We deliberately
+      // do NOT pre-mount hidden MapLibre layers in a separate effect because that
+      // can race with normal state visibility and leave everything stuck hidden.
+      if (showAllStates && preloadPromiseRef.current) {
+        await preloadPromiseRef.current;
 
-          if (!loadedLayerIds.current.has(key) && wantVisible) {
-            tasks.push(ensureLayer(state, layer));
+        for (const state of states) {
+          for (const layer of state.layers) {
+            if (layer.geometryType === "raster") continue;
+            const key = `${state.id}:${layer.id}`;
+            if (loadedLayerIds.current.has(key)) continue;
+
+            const cachedData = preloadedLayerDataRef.current.get(key);
+            if (cachedData) {
+              const sourceId = `src-${state.id}-${layer.id}`;
+              if (!map.getSource(sourceId)) {
+                map.addSource(sourceId, { type: "geojson", data: cachedData });
+              }
+              for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+                if (!map.getLayer(spec.id)) map.addLayer(spec);
+                map.setLayoutProperty(spec.id, "visibility", "none");
+              }
+
+              const interactionKey = `${state.id}:${layer.id}`;
+              if (!interactivityAttached.current.has(interactionKey)) {
+                attachInteractivity(map, layer, popupRef, state.id);
+                interactivityAttached.current.add(interactionKey);
+              }
+              loadedLayerIds.current.add(key);
+            } else if (Boolean(layerVisibility[layer.id])) {
+              // A preload request can fail independently. Retry only missing
+              // visible layers here so one bad endpoint cannot blank Show All.
+              tasks.push(ensureLayer(state, layer));
+            }
           }
         }
+
+        await Promise.all(tasks);
+      } else {
+        for (const state of states) {
+          for (const layer of state.layers) {
+            if (layer.geometryType === "raster") continue;
+            const wantVisible = Boolean(layerVisibility[layer.id]);
+            const key = `${state.id}:${layer.id}`;
+
+            if (!loadedLayerIds.current.has(key) && wantVisible) {
+              tasks.push(ensureLayer(state, layer));
+            }
+          }
+        }
+        await Promise.all(tasks);
       }
 
-      await Promise.all(tasks);
       if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
 
       const setStateVisibility = (state: (typeof states)[number], visible: boolean) => {
@@ -528,13 +568,12 @@ export default function MapView() {
         window.setTimeout(() => {
           if (
             showAllAnimationRunRef.current !== runId ||
-            lastSyncedViewKey.current !== viewKey ||
-            !showAllStatesRef.current
+            lastSyncedViewKey.current !== viewKey
           ) {
             return;
           }
           setStateVisibility(state, true);
-        }, index * 95);
+        }, index * 125);
       });
     }
 

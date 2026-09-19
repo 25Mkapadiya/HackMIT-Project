@@ -29,6 +29,23 @@ import { HAWAII } from "./hawaii";
 import { IDAHO } from "./idaho";
 import { MONTANA } from "./montana";
 import { WYOMING } from "./wyoming";
+import { RHODE_ISLAND } from "./rhodeisland";
+import { CONNECTICUT } from "./connecticut";
+import { NEW_YORK } from "./newyork";
+import { NEW_JERSEY } from "./newjersey";
+import { PENNSYLVANIA } from "./pennsylvania";
+import { OHIO } from "./ohio";
+import { MICHIGAN } from "./michigan";
+import { INDIANA } from "./indiana";
+import { WISCONSIN } from "./wisconsin";
+import { IOWA } from "./iowa";
+import { MINNESOTA } from "./minnesota";
+import { KANSAS } from "./kansas";
+import { NEBRASKA } from "./nebraska";
+import { SOUTH_DAKOTA } from "./southdakota";
+import { NORTH_DAKOTA } from "./northdakota";
+import { NEW_MEXICO } from "./newmexico";
+import { ARIZONA } from "./arizona";
 import { NEVADA } from "./nevada";
 import { UTAH } from "./utah";
 import { COLORADO } from "./colorado";
@@ -79,6 +96,23 @@ const LIVE_STATES: StateDefinition[] = [
   IDAHO,
   MONTANA,
   WYOMING,
+  RHODE_ISLAND,
+  CONNECTICUT,
+  NEW_YORK,
+  NEW_JERSEY,
+  PENNSYLVANIA,
+  OHIO,
+  MICHIGAN,
+  INDIANA,
+  WISCONSIN,
+  IOWA,
+  MINNESOTA,
+  KANSAS,
+  NEBRASKA,
+  SOUTH_DAKOTA,
+  NORTH_DAKOTA,
+  NEW_MEXICO,
+  ARIZONA,
   NEVADA,
   UTAH,
   COLORADO,
