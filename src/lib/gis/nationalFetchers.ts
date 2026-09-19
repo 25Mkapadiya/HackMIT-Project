@@ -116,14 +116,6 @@ export async function fetchFemaFloodZones(bbox: Bbox) {
   );
 }
 
-export async function fetchUsfsNationalForestLands(bbox: Bbox) {
-  return queryArcGisGeoJSON(
-    NATIONAL_SOURCES.usfsNationalForestLands.url,
-    { bbox, outFields: "NFSLANDUNITNAME,NFSLANDUNITTYPE,REGION", maxAllowableOffset: generalizationFor(bbox) },
-    TTL.ONE_DAY
-  );
-}
-
 // ------------------------------------------------------------- COMMUNITY (nationwide)
 
 export async function fetchPopulationTracts(bbox: Bbox) {

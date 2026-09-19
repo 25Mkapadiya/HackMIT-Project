@@ -29,6 +29,8 @@ export default function MapView() {
   // string, so they only need registering once, ever, per layer id.
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
+  const focusAnimatingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
   const layerVisibility = useAppStore((s) => s.layerVisibility);
@@ -54,8 +56,28 @@ export default function MapView() {
       renderWorldCopies: false,
       attributionControl: { compact: true },
     });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    const navigationControl = new maplibregl.NavigationControl({ visualizePitch: true });
+    map.addControl(navigationControl, "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "imperial", maxWidth: 120 }), "bottom-left");
+
+    // Repurpose the existing white compass button as a guided "focus active site"
+    // control once a data-center scenario exists. Before that, it keeps its normal
+    // north-reset behavior.
+    const compassButton = map
+      .getContainer()
+      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+    const handleCompassFocus = (event: MouseEvent) => {
+      const target = activeScenarioRef.current;
+      if (!target || focusAnimatingRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      focusAnimatingRef.current = true;
+      spiralFocusOnSite(map, target, () => {
+        focusAnimatingRef.current = false;
+      });
+    };
+    compassButton?.addEventListener("click", handleCompassFocus, true);
 
     fitMinZoomToBounds(map);
     map.on("resize", () => fitMinZoomToBounds(map));
@@ -120,11 +142,36 @@ export default function MapView() {
 
     mapRef.current = map;
     return () => {
+      compassButton?.removeEventListener("click", handleCompassFocus, true);
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- keep the compass target + accessible label in sync with the active site ----
+  useEffect(() => {
+    const active = scenarios.find((scenario) => scenario.id === activeScenarioId) ?? null;
+    activeScenarioRef.current = active
+      ? { id: active.id, label: active.label, lng: active.lng, lat: active.lat }
+      : null;
+
+    if (!mapRef.current) return;
+    const compassButton = mapRef.current
+      .getContainer()
+      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+    if (!compassButton) return;
+
+    if (active) {
+      compassButton.title = `Focus on ${active.label}`;
+      compassButton.setAttribute("aria-label", `Focus on ${active.label}`);
+      compassButton.dataset.focusSite = "true";
+    } else {
+      compassButton.title = "Reset bearing to north";
+      compassButton.setAttribute("aria-label", "Reset bearing to north");
+      delete compassButton.dataset.focusSite;
+    }
+  }, [scenarios, activeScenarioId, mapReady]);
 
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
@@ -194,8 +241,9 @@ export default function MapView() {
 
     async function syncLayers() {
       for (const layer of state.layers) {
-        // Terrain uses a raster-dem source loaded directly by MapLibre, not the GeoJSON API.
-        if (layer.id === "terrain-hillshade") continue;
+        // Visual raster layers (forest cover, terrain relief) are loaded directly
+        // by MapLibre in their own effects below, not through the GeoJSON API.
+        if (layer.geometryType === "raster") continue;
         const wantVisible = Boolean(layerVisibility[layer.id]);
         const sourceId = `src-${layer.id}`;
 
@@ -238,49 +286,111 @@ export default function MapView() {
     syncLayers();
   }, [mapReady, activeStateId, layerVisibility]);
 
-  // ---- terrain / mountains (public Mapzen Terrain Tiles on AWS) ----
+  // ---- U.S. visual forest cover ----
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const visible = Boolean(layerVisibility["forest-cover"]);
+    const layerId = "forest-cover-vector";
+
+    // Reuse the CARTO basemap's vector land-cover source so forest edges stay
+    // crisp and map-like at every zoom instead of looking like a scientific raster.
+    // Nationwide — the same layer works unmodified for every state.
+    if (!map.getLayer(layerId) && map.getSource("carto")) {
+      map.addLayer(
+        {
+          id: layerId,
+          type: "fill",
+          source: "carto",
+          "source-layer": "landcover",
+          filter: ["==", "class", "wood"],
+          minzoom: 4,
+          paint: {
+            "fill-color": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, "#234b31",
+              7, "#2f6842",
+              10, "#3b7d4e",
+              13, "#4a8d59"
+            ],
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, 0.38,
+              7, 0.48,
+              10, 0.56,
+              13, 0.62
+            ],
+            "fill-antialias": true
+          },
+          layout: { visibility: visible ? "visible" : "none" },
+        },
+        "proposed-points-glow"
+      );
+    } else if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    }
+  }, [mapReady, layerVisibility]);
+
+  // ---- U.S.-only terrain / mountains: cached USGS National Map shaded relief ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
     const visible = Boolean(layerVisibility["terrain-hillshade"]);
-    const sourceId = "terrain-dem";
-    const hillshadeId = "terrain-hillshade-map";
+    const sourceId = "usgs-shaded-relief";
+    const layerId = "terrain-relief-raster";
+
+    // Never enable 3D terrain. This stays a flat cartographic relief overlay.
+    if (map.getTerrain()) map.setTerrain(null);
 
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
-        type: "raster-dem",
-        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        type: "raster",
+        tiles: [
+          "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}",
+        ],
         tileSize: 256,
-        maxzoom: 15,
-        encoding: "terrarium",
-        attribution: "Terrain Tiles © Mapzen / Tilezen contributors",
+        minzoom: 4,
+        maxzoom: 14,
+        bounds: [-179.9, 15, -63, 72],
+        attribution: "Shaded relief © USGS The National Map / 3DEP",
       });
     }
 
-    if (!map.getLayer(hillshadeId)) {
+    if (!map.getLayer(layerId)) {
       map.addLayer(
         {
-          id: hillshadeId,
-          type: "hillshade",
+          id: layerId,
+          type: "raster",
           source: sourceId,
+          minzoom: 4,
+          maxzoom: 15,
           paint: {
-            "hillshade-exaggeration": 0.5,
-            "hillshade-shadow-color": "#10151b",
-            "hillshade-highlight-color": "#d8d1c2",
-            "hillshade-accent-color": "#7b7469",
+            "raster-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, 0.15,
+              7, 0.20,
+              10, 0.24,
+              13, 0.20
+            ],
+            "raster-resampling": "linear",
+            "raster-fade-duration": 0,
+            "raster-saturation": -1,
+            "raster-contrast": 0.02,
+            "raster-brightness-min": 0.20,
+            "raster-brightness-max": 0.86,
           },
           layout: { visibility: visible ? "visible" : "none" },
         },
         "proposed-points-glow"
       );
     } else {
-      map.setLayoutProperty(hillshadeId, "visibility", visible ? "visible" : "none");
-    }
-
-    if (visible) {
-      map.setTerrain({ source: sourceId, exaggeration: 1.15 });
-    } else if (map.getTerrain()) {
-      map.setTerrain(null);
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
     }
   }, [mapReady, layerVisibility]);
 
@@ -328,6 +438,64 @@ export default function MapView() {
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over
   // the `absolute` utility class and collapses this container to zero height.
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
+}
+
+function spiralFocusOnSite(
+  map: maplibregl.Map,
+  site: { lng: number; lat: number },
+  onDone: () => void
+) {
+  const interactionHandlers = [
+    map.dragPan,
+    map.scrollZoom,
+    map.boxZoom,
+    map.dragRotate,
+    map.keyboard,
+    map.doubleClickZoom,
+    map.touchZoomRotate,
+  ];
+  const previouslyEnabled = interactionHandlers.map((handler) => handler.isEnabled());
+
+  for (const handler of interactionHandlers) handler.disable();
+  map.stop();
+
+  const startBearing = map.getBearing();
+  const currentZoom = map.getZoom();
+  const firstZoom = Math.max(10.8, Math.min(13.2, currentZoom + 2.4));
+  const finalZoom = Math.max(15.2, Math.min(16.4, firstZoom + 3.1));
+
+  const restoreInteraction = () => {
+    interactionHandlers.forEach((handler, index) => {
+      if (previouslyEnabled[index]) handler.enable();
+    });
+    onDone();
+  };
+
+  const secondPhase = () => {
+    map.easeTo({
+      center: [site.lng, site.lat],
+      zoom: finalZoom,
+      bearing: startBearing + 320,
+      pitch: 52,
+      duration: 1250,
+      offset: [0, 36],
+      easing: (t) => 1 - Math.pow(1 - t, 3),
+      essential: true,
+    });
+    map.once("moveend", restoreInteraction);
+  };
+
+  map.easeTo({
+    center: [site.lng, site.lat],
+    zoom: firstZoom,
+    bearing: startBearing + 155,
+    pitch: 30,
+    duration: 950,
+    offset: [0, 18],
+    easing: (t) => t * t * (3 - 2 * t),
+    essential: true,
+  });
+  map.once("moveend", secondPhase);
 }
 
 // A fixed minZoom that "roughly" fits US_MAX_BOUNDS only works for one window width — on a

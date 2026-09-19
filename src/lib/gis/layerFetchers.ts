@@ -9,7 +9,6 @@ import {
   fetchUsgsGauges,
   fetchColocationFacilities,
   fetchFemaFloodZones,
-  fetchUsfsNationalForestLands,
   fetchPopulationTracts,
   fetchEiaPowerPlants,
 } from "./nationalFetchers";
@@ -67,6 +66,10 @@ async function fetchDroughtAreas(bbox: Bbox) {
 }
 
 // ----------------------------------------------------------- ENVIRONMENT
+// National Forest System boundaries (USFS) are no longer fetched as a layer —
+// forest cover is now shown via the CARTO basemap's own vector landcover
+// (see MapView.tsx's "forest-cover" effect), which reads better at every zoom
+// and isn't limited to federally-administered land.
 
 async function fetchStateHighways(bbox: Bbox) {
   return queryArcGisGeoJSON(
@@ -96,7 +99,6 @@ const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> =
   "usgs-gauges": (bbox) => fetchUsgsGauges(bbox, "WA"),
   "colocation-facilities": (bbox) => fetchColocationFacilities(bbox, "WA"),
   "flood-zones": fetchFemaFloodZones,
-  "national-forest-lands": fetchUsfsNationalForestLands,
   "state-highways": fetchStateHighways,
   "population-tracts": fetchPopulationTracts,
   "data-centers": fetchDataCenters,
