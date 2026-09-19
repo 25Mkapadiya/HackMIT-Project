@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { CoolingMedium, CoolingTechnology, LoopType, ScenarioAnalysis, ScenarioConfig } from "@/lib/types";
 import { WASHINGTON } from "@/states/washington";
-import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
+import { getState, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
 
 function defaultLayerVisibility(stateId: string): Record<string, boolean> {
   const layers = getState(stateId)?.layers ?? WASHINGTON.layers;
@@ -76,7 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       if (!v) return { showAllStates: false };
       const mergedVisibility = { ...s.layerVisibility };
-      for (const state of getEnabledStates()) {
+      for (const state of getShowAllStates()) {
         for (const layer of state.layers) {
           if (mergedVisibility[layer.id] === undefined) {
             mergedVisibility[layer.id] = Boolean(layer.defaultVisible);
