@@ -12,6 +12,7 @@ import { GEORGIA } from "./georgia";
 import { SOUTH_CAROLINA } from "./southcarolina";
 import { NORTH_CAROLINA } from "./northcarolina";
 import { VIRGINIA } from "./virginia";
+import { ILLINOIS } from "./illinois";
 import { MISSOURI } from "./missouri";
 import { US_STATES_DIRECTORY } from "./directory";
 
