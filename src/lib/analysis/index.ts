@@ -6,6 +6,7 @@ import { computeWaterAnalysis } from "./water";
 import { computeLandAnalysis } from "./land";
 import { computeDevelopmentEstimate } from "./development";
 import { synthesizeGaps } from "./gaps";
+import { getAnalysisContext } from "./contextRegistry";
 
 /**
  * Runs the full site analysis SEQUENTIALLY, in the product-specified order:
@@ -14,16 +15,22 @@ import { synthesizeGaps } from "./gaps";
  * rather than re-fetching it, which is the one place a later step depends on
  * an earlier one; every other step is independent and could be parallelized
  * later without changing results.
+ *
+ * Every step reads its GIS fetchers/source metadata from the StateAnalysisContext
+ * resolved for scenario.stateId — this function itself has no state-specific
+ * knowledge, so adding a state means adding a context, not touching this file.
  */
 export async function runScenarioAnalysis(scenario: ScenarioConfig): Promise<ScenarioAnalysis> {
-  const power = await computePowerAnalysis(scenario);
-  const fiber = await computeFiberAnalysis(scenario);
-  const regulation = await computeRegulationAnalysis(scenario, power.utilityTerritory.value);
-  const water = await computeWaterAnalysis(scenario);
-  const land = await computeLandAnalysis(scenario);
+  const ctx = getAnalysisContext(scenario.stateId);
 
-  const development = await computeDevelopmentEstimate(scenario, land);
-  const gaps = synthesizeGaps(power, fiber, regulation, water, land);
+  const power = await computePowerAnalysis(scenario, ctx);
+  const fiber = await computeFiberAnalysis(scenario, ctx);
+  const regulation = await computeRegulationAnalysis(scenario, power.utilityTerritory.value, ctx);
+  const water = await computeWaterAnalysis(scenario, ctx);
+  const land = await computeLandAnalysis(scenario, ctx);
+
+  const development = await computeDevelopmentEstimate(scenario, land, ctx);
+  const gaps = synthesizeGaps(power, fiber, regulation, water, land, ctx);
 
   return {
     scenarioId: scenario.id,

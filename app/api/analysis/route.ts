@@ -3,6 +3,7 @@ import type { ScenarioConfig } from "@/lib/types";
 import { runScenarioAnalysis } from "@/lib/analysis";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
+import { getState } from "@/states/registry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -18,9 +19,16 @@ export async function POST(req: NextRequest) {
   if (
     typeof scenario?.lng !== "number" ||
     typeof scenario?.lat !== "number" ||
-    typeof scenario?.mwLoad !== "number"
+    typeof scenario?.mwLoad !== "number" ||
+    typeof scenario?.stateId !== "string"
   ) {
-    return NextResponse.json({ error: "scenario.lng, scenario.lat, and scenario.mwLoad are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "scenario.stateId, scenario.lng, scenario.lat, and scenario.mwLoad are required" },
+      { status: 400 }
+    );
+  }
+  if (!getState(scenario.stateId)?.enabled) {
+    return NextResponse.json({ error: `No live analysis pipeline for state "${scenario.stateId}"` }, { status: 400 });
   }
 
   try {
@@ -42,10 +50,12 @@ export async function POST(req: NextRequest) {
 async function persistScenario(scenario: ScenarioConfig, analysis: Awaited<ReturnType<typeof runScenarioAnalysis>>) {
   const supabase = getSupabaseServerClient();
   if (!supabase) return;
+  const stateCode = getState(scenario.stateId)?.abbreviation;
+  if (!stateCode) return;
   try {
     const { error: scenarioError } = await supabase.from("scenarios").insert({
       id: scenario.id,
-      state_code: "WA",
+      state_code: stateCode,
       label: scenario.label,
       lng: scenario.lng,
       lat: scenario.lat,

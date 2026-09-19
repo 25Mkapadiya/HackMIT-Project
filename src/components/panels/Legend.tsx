@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { WASHINGTON } from "@/states/washington";
+import { getState } from "@/states/registry";
 
 function LegendSwatch({ color, kind, lineWidth }: { color: string; kind?: "line" | "fill" | "circle"; lineWidth?: number }) {
   if (kind === "circle")
@@ -19,9 +19,11 @@ function LegendSwatch({ color, kind, lineWidth }: { color: string; kind?: "line"
 
 export default function Legend() {
   const layerVisibility = useAppStore((s) => s.layerVisibility);
+  const activeStateId = useAppStore((s) => s.activeStateId);
   const [collapsed, setCollapsed] = useState(false);
 
-  const visibleLayers = WASHINGTON.layers.filter((l) => layerVisibility[l.id] && l.legend?.length);
+  const stateLayers = getState(activeStateId)?.layers ?? [];
+  const visibleLayers = stateLayers.filter((l) => layerVisibility[l.id] && l.legend?.length);
   if (visibleLayers.length === 0) return null;
 
   return (

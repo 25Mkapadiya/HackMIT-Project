@@ -4,21 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { WASHINGTON } from "@/states/washington";
-import { getWaLayer } from "@/states/washington/layers";
-import { getState } from "@/states/registry";
+import type { LayerDefinition } from "@/lib/types";
+import { getState, DEFAULT_STATE_ID } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
 import { BASEMAP_STYLE, emptyFeatureCollection } from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
 import { buildPopupHtml } from "./popupContent";
 
-const STATEWIDE_BBOX = [
-  WASHINGTON.bounds[0][0],
-  WASHINGTON.bounds[0][1],
-  WASHINGTON.bounds[1][0],
-  WASHINGTON.bounds[1][1],
-].join(",");
+function statewideBbox(state: { bounds: [[number, number], [number, number]] }): string {
+  return [state.bounds[0][0], state.bounds[0][1], state.bounds[1][0], state.bounds[1][1]].join(",");
+}
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -39,11 +35,12 @@ export default function MapView() {
   // ---- init map (once) ----
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    const defaultState = getState(DEFAULT_STATE_ID)!;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: BASEMAP_STYLE,
-      center: WASHINGTON.center,
-      zoom: WASHINGTON.defaultZoom,
+      center: defaultState.center,
+      zoom: defaultState.defaultZoom,
       pitch: 0,
       maxPitch: 68,
       attributionControl: { compact: true },
@@ -148,13 +145,41 @@ export default function MapView() {
     mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
   }, [mapReady, activeStateId]);
 
+  // ---- tear down the previous state's map layers on a state switch ----
+  // Layer ids are shared across states for the same concept (e.g.
+  // "transmission-lines"), so without this, switching from Washington to
+  // Minnesota would just re-show Washington's already-loaded transmission
+  // geometry instead of fetching Minnesota's.
+  const isFirstLayerReset = useRef(true);
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    if (isFirstLayerReset.current) {
+      isFirstLayerReset.current = false;
+      return;
+    }
+    const map = mapRef.current;
+    for (const layerId of loadedLayerIds.current) {
+      for (const suffix of ["-line", "-fill", "-outline", "-point"]) {
+        const mlId = `${layerId}${suffix}`;
+        if (map.getLayer(mlId)) map.removeLayer(mlId);
+      }
+      const sourceId = `src-${layerId}`;
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+    }
+    loadedLayerIds.current.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, activeStateId]);
+
   // ---- load/toggle infrastructure layers ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
+    const state = getState(activeStateId);
+    if (!state) return;
+    const bbox = statewideBbox(state);
 
     async function syncLayers() {
-      for (const layer of WASHINGTON.layers) {
+      for (const layer of state!.layers) {
         const wantVisible = Boolean(layerVisibility[layer.id]);
         const sourceId = `src-${layer.id}`;
 
@@ -163,7 +188,7 @@ export default function MapView() {
           if (loadingLayerIds.current.has(layer.id)) continue;
           loadingLayerIds.current.add(layer.id);
           try {
-            const res = await fetch(`${layer.endpoint}?bbox=${STATEWIDE_BBOX}`);
+            const res = await fetch(`${layer.endpoint}?bbox=${bbox}`);
             const data = (await res.json()) as FeatureCollection;
             if (!mapRef.current) return;
             if (!map.getSource(sourceId)) {
@@ -172,7 +197,7 @@ export default function MapView() {
               for (const spec of specs) {
                 if (!map.getLayer(spec.id)) map.addLayer(spec);
               }
-              attachInteractivity(map, layer.id, popupRef);
+              attachInteractivity(map, layer, popupRef);
             }
             loadedLayerIds.current.add(layer.id);
           } catch (err) {
@@ -192,16 +217,19 @@ export default function MapView() {
     }
 
     syncLayers();
-  }, [mapReady, layerVisibility]);
+  }, [mapReady, layerVisibility, activeStateId]);
 
   // ---- sync proposed scenarios (points + 3D campus) ----
+  // Only the active state's own scenarios are drawn — a site proposed in
+  // Washington shouldn't appear pinned on Minnesota's map after switching.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
+    const visibleScenarios = scenarios.filter((s) => s.stateId === activeStateId);
 
     const pointsFc: FeatureCollection = {
       type: "FeatureCollection",
-      features: scenarios.map((s) => ({
+      features: visibleScenarios.map((s) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [s.lng, s.lat] },
         properties: { label: s.label, id: s.id, active: s.id === activeScenarioId },
@@ -209,14 +237,14 @@ export default function MapView() {
     };
     const campusFc: FeatureCollection = {
       type: "FeatureCollection",
-      features: scenarios.flatMap((s) => generateCampusFootprint(s).features),
+      features: visibleScenarios.flatMap((s) => generateCampusFootprint(s).features),
     };
 
     const pointsSource = map.getSource("proposed-points") as maplibregl.GeoJSONSource | undefined;
     pointsSource?.setData(pointsFc);
     const campusSource = map.getSource("campus-buildings") as maplibregl.GeoJSONSource | undefined;
     campusSource?.setData(campusFc);
-  }, [mapReady, scenarios, activeScenarioId]);
+  }, [mapReady, scenarios, activeScenarioId, activeStateId]);
 
   // ---- click a proposed site marker to select it ----
   useEffect(() => {
@@ -242,10 +270,10 @@ export default function MapView() {
 
 function attachInteractivity(
   map: maplibregl.Map,
-  layerId: string,
+  layer: LayerDefinition,
   popupRef: React.MutableRefObject<maplibregl.Popup | null>
 ) {
-  for (const mlLayerId of interactiveLayerIds(getWaLayer(layerId)!)) {
+  for (const mlLayerId of interactiveLayerIds(layer)) {
     map.on("mouseenter", mlLayerId, () => {
       map.getCanvas().style.cursor = "pointer";
     });
@@ -258,7 +286,7 @@ function attachInteractivity(
       popupRef.current?.remove();
       popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
         .setLngLat(e.lngLat)
-        .setHTML(buildPopupHtml(layerId, feature.properties ?? {}))
+        .setHTML(buildPopupHtml(layer.id, feature.properties ?? {}))
         .addTo(map);
     });
   }

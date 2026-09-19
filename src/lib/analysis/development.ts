@@ -1,9 +1,14 @@
 import type { DevelopmentEstimate, LandAnalysis, ScenarioConfig } from "@/lib/types";
 import { CONSTRUCTION_COST_PER_MW_USD, DEVELOPMENT_TIMELINE_YEARS } from "@/lib/constants/assumptions";
-import { getWaIncentives } from "@/lib/supabase/queries";
+import { getIncentives } from "@/lib/supabase/queries";
+import type { StateAnalysisContext } from "./context";
 
-export async function computeDevelopmentEstimate(scenario: ScenarioConfig, land: LandAnalysis): Promise<DevelopmentEstimate> {
-  const incentives = await getWaIncentives();
+export async function computeDevelopmentEstimate(
+  scenario: ScenarioConfig,
+  land: LandAnalysis,
+  ctx: StateAnalysisContext
+): Promise<DevelopmentEstimate> {
+  const incentives = await getIncentives(ctx.stateCode);
   const [lowPerMw, highPerMw] = CONSTRUCTION_COST_PER_MW_USD;
   const low = Math.round((lowPerMw * scenario.mwLoad) / 1_000_000) * 1_000_000;
   const high = Math.round((highPerMw * scenario.mwLoad) / 1_000_000) * 1_000_000;
@@ -43,13 +48,13 @@ export async function computeDevelopmentEstimate(scenario: ScenarioConfig, land:
       value: incentives.map((i) => `${i.title} (${i.status})`),
       confidence: "proxy",
       source: {
-        id: "curated-wa-incentives",
-        name: "Curated WA data center tax incentive tracker",
+        id: `curated-${ctx.stateCode.toLowerCase()}-incentives`,
+        name: `Curated ${ctx.stateCode} data center tax incentive tracker`,
         url: "",
-        methodology: "Compiled from RCW/DOR guidance references, not a per-site eligibility determination.",
+        methodology: "Compiled from statute/agency guidance references, not a per-site eligibility determination.",
       },
       caveats: [
-        "Do not assume eligibility until conditions (county, job/investment minimums, MW threshold) are checked against current RCW and DOR guidance.",
+        "Do not assume eligibility until conditions (county, job/investment minimums, MW threshold) are checked against current statute and agency guidance.",
       ],
     },
   };

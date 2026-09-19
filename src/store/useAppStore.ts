@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { CoolingMedium, CoolingTechnology, LoopType, ScenarioAnalysis, ScenarioConfig } from "@/lib/types";
-import { WASHINGTON } from "@/states/washington";
+import { STATE_REGISTRY } from "@/states/registry";
 
 type AnalysisState =
   | { status: "idle" }
@@ -45,9 +45,25 @@ function nextScenarioId() {
   return crypto.randomUUID();
 }
 
+/**
+ * Union of every registered state's layer ids, defaulted from whichever
+ * state defines that id first. Shared concept ids (e.g. "transmission-lines")
+ * only get one entry, which is also what lets a layer's on/off toggle
+ * persist naturally across a state switch instead of resetting.
+ */
+function defaultLayerVisibility(): Record<string, boolean> {
+  const visibility: Record<string, boolean> = {};
+  for (const state of STATE_REGISTRY) {
+    for (const layer of state.layers) {
+      if (!(layer.id in visibility)) visibility[layer.id] = Boolean(layer.defaultVisible);
+    }
+  }
+  return visibility;
+}
+
 const SITE_LABELS = ["Site A", "Site B", "Site C", "Site D", "Site E", "Site F"];
 
-export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "lng" | "lat" | "createdAt"> = {
+export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "stateId" | "label" | "lng" | "lat" | "createdAt"> = {
   mwLoad: 100,
   buildings: 3,
   coolingTechnology: "cooling_tower_evaporative" as CoolingTechnology,
@@ -60,7 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeStateId: "washington",
   setActiveStateId: (id) => set({ activeStateId: id }),
 
-  layerVisibility: Object.fromEntries(WASHINGTON.layers.map((l) => [l.id, Boolean(l.defaultVisible)])),
+  layerVisibility: defaultLayerVisibility(),
   toggleLayer: (id) =>
     set((s) => ({ layerVisibility: { ...s.layerVisibility, [id]: !s.layerVisibility[id] } })),
 
@@ -76,6 +92,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const idx = get().scenarios.length % SITE_LABELS.length;
     const scenario: ScenarioConfig = {
       id,
+      stateId: get().activeStateId,
       label: SITE_LABELS[idx] ?? `Site ${idx + 1}`,
       lng,
       lat,

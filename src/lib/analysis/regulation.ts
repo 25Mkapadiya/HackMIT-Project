@@ -1,7 +1,7 @@
 import type { RegulationAnalysis, ScenarioConfig } from "@/lib/types";
 import { cached, TTL } from "@/lib/cache/memoryCache";
-import { WA_SOURCES } from "@/states/washington/sources";
-import { getWaUtilities, matchUtility } from "@/lib/supabase/queries";
+import { getUtilities, matchUtility } from "@/lib/supabase/queries";
+import { getSource, type StateAnalysisContext } from "./context";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -29,11 +29,14 @@ async function reverseGeocodeCounty(lng: number, lat: number): Promise<string | 
 
 export async function computeRegulationAnalysis(
   scenario: ScenarioConfig,
-  utilityTerritoryName: string | null
+  utilityTerritoryName: string | null,
+  ctx: StateAnalysisContext
 ): Promise<RegulationAnalysis> {
+  const utilityTerritorySource = getSource(ctx, "utilityTerritories");
+
   const [county, utilities] = await Promise.all([
     reverseGeocodeCounty(scenario.lng, scenario.lat),
-    getWaUtilities(),
+    getUtilities(ctx.stateCode),
   ]);
   const utility = matchUtility(utilityTerritoryName, utilities);
 
@@ -42,7 +45,7 @@ export async function computeRegulationAnalysis(
       label: "Utility service territory",
       value: utilityTerritoryName,
       confidence: utilityTerritoryName ? "proxy" : "unknown",
-      source: WA_SOURCES.waUtilityTerritories,
+      source: utilityTerritorySource,
     },
     county: {
       label: "County",
@@ -58,12 +61,13 @@ export async function computeRegulationAnalysis(
     permittingNote: {
       label: "General permitting context",
       value:
-        "Large facilities in Washington typically trigger county conditional-use/site-plan review and, depending on size and location, State Environmental Policy Act (SEPA) review. Utility interconnection is a separate process from land-use permitting.",
+        ctx.permittingNote ??
+        "Large facilities typically trigger county conditional-use/site-plan review and, depending on size and location, state environmental review. Utility interconnection is a separate process from land-use permitting.",
       confidence: "estimated",
       source: {
-        id: "wa-sepa-general",
-        name: "Washington State Environmental Policy Act (general reference)",
-        url: "https://ecology.wa.gov/regulations-permits/sepa",
+        id: `${ctx.stateId}-permitting-general`,
+        name: `${ctx.stateCode} general permitting reference`,
+        url: "",
         methodology: "General regulatory context, not a jurisdiction-specific legal determination.",
       },
       caveats: ["This is general context, not legal or permitting advice — requirements vary by county and project."],
@@ -73,10 +77,10 @@ export async function computeRegulationAnalysis(
       value: utility ? utility.large_load_process_url ?? utility.website ?? utility.name : null,
       confidence: utility ? "fact" : "unknown",
       source: {
-        id: "curated-wa-utilities",
-        name: "Curated WA utility directory (large-load process & contacts)",
+        id: `curated-${ctx.stateCode.toLowerCase()}-utilities`,
+        name: `Curated ${ctx.stateCode} utility directory (large-load process & contacts)`,
         url: "",
-        methodology: "Utility resolved by matching the ArcGIS service-territory name to a hand-curated utility record.",
+        methodology: "Utility resolved by matching the live service-territory name to a hand-curated utility record.",
       },
       caveats: utility
         ? [utility.large_load_notes, utility.large_load_contact ? `Contact: ${utility.large_load_contact}` : null].filter(

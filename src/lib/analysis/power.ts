@@ -1,9 +1,9 @@
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { DistanceResult, PowerAnalysis, ScenarioConfig } from "@/lib/types";
-import { WA_LAYER_FETCHERS } from "@/lib/gis/layerFetchers";
 import { bboxAroundMiles, milesBetween, nearestFeature, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
-import { WA_SOURCES } from "@/states/washington/sources";
 import { NEARBY_GENERATION_RADIUS_MI, VOLTAGE_TIERS } from "@/lib/constants/assumptions";
+import { fetchLayer, getSource, type StateAnalysisContext } from "./context";
+import type { SourceMeta } from "@/lib/types";
 
 interface TransmissionProps {
   XRefCd?: string;
@@ -13,7 +13,7 @@ interface TransmissionProps {
 
 function toDistanceResult(
   result: { feature: Feature<Geometry, TransmissionProps> | null; distanceMiles: number | null },
-  source = WA_SOURCES.bpaTransmission
+  source: SourceMeta
 ): DistanceResult & { voltageKv: number | null } {
   const voltage = result.feature?.properties?.VoltageMeas ?? null;
   const name = result.feature?.properties?.OperatingLineNm ?? result.feature?.properties?.XRefCd ?? null;
@@ -26,32 +26,34 @@ function toDistanceResult(
   };
 }
 
-export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<PowerAnalysis> {
+export async function computePowerAnalysis(scenario: ScenarioConfig, ctx: StateAnalysisContext): Promise<PowerAnalysis> {
   const { lng, lat, mwLoad } = scenario;
+  const transmissionSource = getSource(ctx, "transmission");
+  const utilityTerritorySource = getSource(ctx, "utilityTerritories");
+  const eiaSource = getSource(ctx, "eia");
 
   const transmissionBbox = bboxAroundMiles(lng, lat, 35);
   const territoryBbox = bboxAroundMiles(lng, lat, 20);
   const generationBbox = bboxAroundMiles(lng, lat, NEARBY_GENERATION_RADIUS_MI);
 
   const [transmissionFc, territoryFc, generationFc] = await Promise.all([
-    WA_LAYER_FETCHERS["transmission-lines"]!(transmissionBbox) as Promise<FeatureCollection<Geometry, TransmissionProps>>,
-    WA_LAYER_FETCHERS["utility-territories"]!(territoryBbox) as Promise<
-      FeatureCollection<Geometry, { Name?: string }>
-    >,
-    WA_LAYER_FETCHERS["power-plants"]!(generationBbox) as Promise<
-      FeatureCollection<Geometry, { plantName?: string; fuel?: string; nameplateMw?: number }>
-    >,
+    fetchLayer<TransmissionProps>(ctx, "transmission-lines", transmissionBbox),
+    fetchLayer<{ Name?: string }>(ctx, "utility-territories", territoryBbox),
+    fetchLayer<{ plantName?: string; fuel?: string; nameplateMw?: number }>(ctx, "power-plants", generationBbox),
   ]);
 
-  const nearestAny = toDistanceResult(nearestFeature(lng, lat, transmissionFc));
+  const nearestAny = toDistanceResult(nearestFeature(lng, lat, transmissionFc), transmissionSource);
   const nearest115 = toDistanceResult(
-    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.mid)
+    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.mid),
+    transmissionSource
   );
   const nearest230 = toDistanceResult(
-    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.high)
+    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.high),
+    transmissionSource
   );
   const nearest500 = toDistanceResult(
-    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.extraHigh)
+    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.extraHigh),
+    transmissionSource
   );
 
   const territory = polygonContaining(lng, lat, territoryFc);
@@ -84,16 +86,16 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
       label: "Utility service territory",
       value: (territory?.properties as { Name?: string } | undefined)?.Name ?? null,
       confidence: territory ? "proxy" : "unknown",
-      source: WA_SOURCES.waUtilityTerritories,
+      source: utilityTerritorySource,
       caveats: [
-        "Boundary is informational, compiled by WA Ecology/UTC — not an official service-territory determination.",
+        "Boundary is informational, compiled from public agency GIS — not an official service-territory determination.",
       ],
     },
     nearbyGeneration: {
       label: `Generation capacity within ${NEARBY_GENERATION_RADIUS_MI} mi`,
       value: eiaConfigured ? { totalMw, count: plants.length, plants: plants.slice(0, 15) } : null,
       confidence: eiaConfigured ? "fact" : "unknown",
-      source: WA_SOURCES.eia,
+      source: eiaSource,
       caveats: eiaConfigured
         ? ["Reflects EIA-reported nameplate capacity, not real-time output or available headroom."]
         : ["EIA_API_KEY is not configured on the server — nearby generation capacity is unavailable."],
@@ -102,7 +104,7 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
       label: "Interconnection / substation capacity",
       value: "Unknown",
       confidence: "unknown",
-      source: WA_SOURCES.bpaTransmission,
+      source: transmissionSource,
       caveats: [
         "Substation and feeder headroom are not published data. Transmission-line proximity indicates access to the grid, not available capacity.",
         "A formal interconnection study by the transmission owner / serving utility is required to determine actual available capacity.",
@@ -112,10 +114,10 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
       label: "Likely next step",
       value:
         mwLoad >= 20
-          ? "Utility/BPA interconnection study likely required given facility size."
+          ? "Utility/transmission-provider interconnection study likely required given facility size."
           : "Utility service inquiry recommended; interconnection study may still apply.",
       confidence: "estimated",
-      source: WA_SOURCES.bpaTransmission,
+      source: transmissionSource,
     },
   };
 }

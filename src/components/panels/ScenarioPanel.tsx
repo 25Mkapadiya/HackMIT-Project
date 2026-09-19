@@ -1,12 +1,20 @@
 "use client";
 
+import { useMemo } from "react";
 import DraggablePanel from "@/components/ui/DraggablePanel";
 import ScenarioConfigForm from "./ScenarioConfigForm";
 import ImpactResults from "./ImpactResults";
 import { useAppStore } from "@/store/useAppStore";
 
 export default function ScenarioPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
-  const scenarios = useAppStore((s) => s.scenarios);
+  const activeStateId = useAppStore((s) => s.activeStateId);
+  const allScenarios = useAppStore((s) => s.scenarios);
+  // Only the active state's own scenarios — a Washington site shouldn't show
+  // up as a tab while browsing Minnesota's map, and vice versa.
+  const scenarios = useMemo(
+    () => allScenarios.filter((sc) => sc.stateId === activeStateId),
+    [allScenarios, activeStateId]
+  );
   const activeScenarioId = useAppStore((s) => s.activeScenarioId);
   const setActiveScenario = useAppStore((s) => s.setActiveScenario);
   const updateScenario = useAppStore((s) => s.updateScenario);

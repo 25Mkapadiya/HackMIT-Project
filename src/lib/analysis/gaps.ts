@@ -7,6 +7,7 @@ import type {
   WaterAnalysis,
 } from "@/lib/types";
 import { TRANSMISSION_PROXIMITY_BANDS } from "@/lib/constants/assumptions";
+import type { StateAnalysisContext } from "./context";
 
 /**
  * Synthesizes plain-language infrastructure gaps from the sequential analysis output.
@@ -18,7 +19,8 @@ export function synthesizeGaps(
   fiber: FiberAnalysis,
   regulation: RegulationAnalysis,
   water: WaterAnalysis,
-  land: LandAnalysis
+  land: LandAnalysis,
+  ctx: StateAnalysisContext
 ): InfrastructureGap[] {
   const gaps: InfrastructureGap[] = [];
 
@@ -28,7 +30,7 @@ export function synthesizeGaps(
       category: "power",
       severity: "likely_required",
       summary: "No mapped transmission line found near this site.",
-      detail: "No BPA transmission line was found within the search radius. New transmission or a long interconnection extension is likely required.",
+      detail: "No transmission line was found within the search radius. New transmission or a long interconnection extension is likely required.",
     });
   } else if (nearestKv > TRANSMISSION_PROXIMITY_BANDS.moderate) {
     gaps.push({
@@ -50,7 +52,7 @@ export function synthesizeGaps(
     category: "power",
     severity: "likely_required",
     summary: "Interconnection study required to confirm available capacity.",
-    detail: "Transmission proximity does not indicate available substation/feeder headroom. A formal interconnection study with the serving utility or BPA is the standard next step for a facility of this size.",
+    detail: "Transmission proximity does not indicate available substation/feeder headroom. A formal interconnection study with the serving utility or transmission provider is the standard next step for a facility of this size.",
   });
 
   if (fiber.nearestIxp.distanceMiles == null || fiber.nearestIxp.distanceMiles > 25) {
@@ -120,8 +122,8 @@ export function synthesizeGaps(
     gaps.push({
       category: "land",
       severity: "watch",
-      summary: `${highHazards.length} statewide hazard(s) rated HIGH for Washington.`,
-      detail: `${highHazards.join(", ")}. Confirm seismic design category and wildfire/smoke-intake mitigation requirements during design — this is a statewide baseline, not a site-specific study.`,
+      summary: `${highHazards.length} statewide hazard(s) rated HIGH for ${ctx.stateCode}.`,
+      detail: `${highHazards.join(", ")}. Confirm design provisions appropriate to these hazards during engineering — this is a statewide baseline, not a site-specific study.`,
     });
   }
 

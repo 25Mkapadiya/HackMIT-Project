@@ -22,6 +22,12 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
       ]);
     case "utility-territories":
       return wrap("Utility Territory", [["Utility", (props.Name as string) || "Unknown"]]);
+    case "substations":
+      return wrap("Substation", [
+        ["Name", props.name as string],
+        ["Max voltage", props.maxVoltageKv ? `${props.maxVoltageKv} kV` : "Unknown"],
+        ["Status", (props.status as string) || "Unknown"],
+      ]);
     case "hydrography-rivers":
     case "hydrography-waterbodies":
       return wrap("Hydrography", [["Name", (props.GNIS_Name as string) || "Unnamed"]]);
@@ -39,6 +45,14 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
       return wrap("Colocation / Interconnection Facility", [
         ["Name", props.name as string],
         ["City", props.city as string],
+      ]);
+    case "broadband-coverage":
+      return wrap("Fiber Broadband Coverage (proxy)", [["Technology", (props.TechType as string) || "Fiber"]]);
+    case "protected-land":
+      return wrap("Conservation Easement", [
+        ["Type", (props.ease_type as string) || "Unknown"],
+        ["Acres", props.ease_acres ? Number(props.ease_acres).toFixed(1) : "Unknown"],
+        ["Status", (props.exp_status as string) || "Unknown"],
       ]);
     case "flood-zones":
       return wrap("FEMA Flood Zone", [
