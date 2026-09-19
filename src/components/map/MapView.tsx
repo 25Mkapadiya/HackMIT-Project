@@ -155,6 +155,8 @@ export default function MapView() {
 
     async function syncLayers() {
       for (const layer of WASHINGTON.layers) {
+        // Terrain uses a raster-dem source loaded directly by MapLibre, not the GeoJSON API.
+        if (layer.id === "terrain-hillshade") continue;
         const wantVisible = Boolean(layerVisibility[layer.id]);
         const sourceId = `src-${layer.id}`;
 
@@ -192,6 +194,52 @@ export default function MapView() {
     }
 
     syncLayers();
+  }, [mapReady, layerVisibility]);
+
+  // ---- terrain / mountains (public Mapzen Terrain Tiles on AWS) ----
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const visible = Boolean(layerVisibility["terrain-hillshade"]);
+    const sourceId = "terrain-dem";
+    const hillshadeId = "terrain-hillshade-map";
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "raster-dem",
+        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        maxzoom: 15,
+        encoding: "terrarium",
+        attribution: "Terrain Tiles © Mapzen / Tilezen contributors",
+      });
+    }
+
+    if (!map.getLayer(hillshadeId)) {
+      map.addLayer(
+        {
+          id: hillshadeId,
+          type: "hillshade",
+          source: sourceId,
+          paint: {
+            "hillshade-exaggeration": 0.5,
+            "hillshade-shadow-color": "#10151b",
+            "hillshade-highlight-color": "#d8d1c2",
+            "hillshade-accent-color": "#7b7469",
+          },
+          layout: { visibility: visible ? "visible" : "none" },
+        },
+        "proposed-points-glow"
+      );
+    } else {
+      map.setLayoutProperty(hillshadeId, "visibility", visible ? "visible" : "none");
+    }
+
+    if (visible) {
+      map.setTerrain({ source: sourceId, exaggeration: 1.15 });
+    } else if (map.getTerrain()) {
+      map.setTerrain(null);
+    }
   }, [mapReady, layerVisibility]);
 
   // ---- sync proposed scenarios (points + 3D campus) ----

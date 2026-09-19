@@ -45,6 +45,12 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
         ["Zone", (props.FLD_ZONE as string) || "Unclassified"],
         ["High-risk (SFHA)", props.SFHA_TF === "T" ? "Yes" : "No"],
       ]);
+    case "national-forest-lands":
+      return wrap("National Forest System Land", [
+        ["Name", (props.NFSLANDUNITNAME as string) || "Unnamed"],
+        ["Type", props.NFSLANDUNITTYPE as string],
+        ["Region", props.REGION as string],
+      ]);
     case "state-highways":
       return wrap("State Highway", [
         ["Route", (props.StateRouteNumber as string) || "—"],
