@@ -26,6 +26,8 @@ export default function MapView() {
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
+  const focusAnimatingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
   const layerVisibility = useAppStore((s) => s.layerVisibility);
@@ -51,8 +53,28 @@ export default function MapView() {
       renderWorldCopies: false,
       attributionControl: { compact: true },
     });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    const navigationControl = new maplibregl.NavigationControl({ visualizePitch: true });
+    map.addControl(navigationControl, "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "imperial", maxWidth: 120 }), "bottom-left");
+
+    // Repurpose the existing white compass button as a guided "focus active site"
+    // control once a data-center scenario exists. Before that, it keeps its normal
+    // north-reset behavior.
+    const compassButton = map
+      .getContainer()
+      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+    const handleCompassFocus = (event: MouseEvent) => {
+      const target = activeScenarioRef.current;
+      if (!target || focusAnimatingRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      focusAnimatingRef.current = true;
+      spiralFocusOnSite(map, target, () => {
+        focusAnimatingRef.current = false;
+      });
+    };
+    compassButton?.addEventListener("click", handleCompassFocus, true);
 
     fitMinZoomToBounds(map);
     map.on("resize", () => fitMinZoomToBounds(map));
@@ -117,11 +139,36 @@ export default function MapView() {
 
     mapRef.current = map;
     return () => {
+      compassButton?.removeEventListener("click", handleCompassFocus, true);
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- keep the compass target + accessible label in sync with the active site ----
+  useEffect(() => {
+    const active = scenarios.find((scenario) => scenario.id === activeScenarioId) ?? null;
+    activeScenarioRef.current = active
+      ? { id: active.id, label: active.label, lng: active.lng, lat: active.lat }
+      : null;
+
+    if (!mapRef.current) return;
+    const compassButton = mapRef.current
+      .getContainer()
+      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+    if (!compassButton) return;
+
+    if (active) {
+      compassButton.title = `Focus on ${active.label}`;
+      compassButton.setAttribute("aria-label", `Focus on ${active.label}`);
+      compassButton.dataset.focusSite = "true";
+    } else {
+      compassButton.title = "Reset bearing to north";
+      compassButton.setAttribute("aria-label", "Reset bearing to north");
+      delete compassButton.dataset.focusSite;
+    }
+  }, [scenarios, activeScenarioId, mapReady]);
 
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
@@ -353,6 +400,65 @@ export default function MapView() {
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over
   // the `absolute` utility class and collapses this container to zero height.
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
+}
+
+
+function spiralFocusOnSite(
+  map: maplibregl.Map,
+  site: { lng: number; lat: number },
+  onDone: () => void
+) {
+  const interactionHandlers = [
+    map.dragPan,
+    map.scrollZoom,
+    map.boxZoom,
+    map.dragRotate,
+    map.keyboard,
+    map.doubleClickZoom,
+    map.touchZoomRotate,
+  ];
+  const previouslyEnabled = interactionHandlers.map((handler) => handler.isEnabled());
+
+  for (const handler of interactionHandlers) handler.disable();
+  map.stop();
+
+  const startBearing = map.getBearing();
+  const currentZoom = map.getZoom();
+  const firstZoom = Math.max(10.8, Math.min(13.2, currentZoom + 2.4));
+  const finalZoom = Math.max(15.2, Math.min(16.4, firstZoom + 3.1));
+
+  const restoreInteraction = () => {
+    interactionHandlers.forEach((handler, index) => {
+      if (previouslyEnabled[index]) handler.enable();
+    });
+    onDone();
+  };
+
+  const secondPhase = () => {
+    map.easeTo({
+      center: [site.lng, site.lat],
+      zoom: finalZoom,
+      bearing: startBearing + 320,
+      pitch: 52,
+      duration: 1250,
+      offset: [0, 36],
+      easing: (t) => 1 - Math.pow(1 - t, 3),
+      essential: true,
+    });
+    map.once("moveend", restoreInteraction);
+  };
+
+  map.easeTo({
+    center: [site.lng, site.lat],
+    zoom: firstZoom,
+    bearing: startBearing + 155,
+    pitch: 30,
+    duration: 950,
+    offset: [0, 18],
+    easing: (t) => t * t * (3 - 2 * t),
+    essential: true,
+  });
+  map.once("moveend", secondPhase);
 }
 
 // A fixed minZoom that "roughly" fits US_MAX_BOUNDS only works for one window width — on a
