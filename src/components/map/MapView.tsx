@@ -262,13 +262,38 @@ export default function MapView() {
         return;
       }
 
-      addScenario(e.lngLat.lng, e.lngLat.lat);
+      let targetStateId = activeStateId;
+
+      if (showAllStates) {
+        const matchingFeature = boundary?.features.find((feature) =>
+          booleanPointInPolygon(clickedPoint, feature)
+        );
+        const postal = matchingFeature?.properties?.postal as string | undefined;
+        const targetState = postal
+          ? getEnabledStates().find((state) => state.abbreviation === postal)
+          : undefined;
+
+        if (!targetState) {
+          popupRef.current?.remove();
+          popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "300px" })
+            .setLngLat(e.lngLat)
+            .setHTML(
+              "<strong>State not implemented yet</strong><br/>Choose a location inside one of the states currently included in Show All."
+            )
+            .addTo(map);
+          return;
+        }
+
+        targetStateId = targetState.id;
+      }
+
+      addScenario(e.lngLat.lng, e.lngLat.lat, targetStateId);
     };
     map.on("click", handleClick);
     return () => {
       map.off("click", handleClick);
     };
-  }, [mapReady, proposeMode, addScenario]);
+  }, [mapReady, proposeMode, addScenario, activeStateId, showAllStates]);
 
   // ---- state / all-implemented-states camera ----
   const lastCameraTargetRef = useRef(`state:${activeStateId}`);
@@ -321,6 +346,8 @@ export default function MapView() {
     }
 
     async function syncLayers() {
+      const tasks: Array<() => Promise<void>> = [];
+
       for (const state of states) {
         const bboxParam = stateBboxParam(state.id);
         for (const layer of state.layers) {
@@ -330,41 +357,59 @@ export default function MapView() {
           const wantVisible = Boolean(layerVisibility[layer.id]);
           const sourceId = `src-${state.id}-${layer.id}`;
 
-          if (!loadedLayerIds.current.has(key)) {
-            if (!wantVisible || loadingLayerIds.current.has(key)) continue;
-            loadingLayerIds.current.add(key);
-            try {
-              const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
-              const data = (await res.json()) as FeatureCollection;
-              if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
-              if (!map.getSource(sourceId)) {
-                map.addSource(sourceId, { type: "geojson", data });
-                const specs = buildLayerSpecs(layer, sourceId, state.id);
-                for (const spec of specs) {
-                  if (!map.getLayer(spec.id)) map.addLayer(spec);
-                }
-                const interactionKey = `${state.id}:${layer.id}`;
-                if (!interactivityAttached.current.has(interactionKey)) {
-                  attachInteractivity(map, layer, popupRef, state.id);
-                  interactivityAttached.current.add(interactionKey);
-                }
-              }
-              loadedLayerIds.current.add(key);
-            } catch (err) {
-              console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
-            } finally {
-              loadingLayerIds.current.delete(key);
-            }
-          } else {
+          if (loadedLayerIds.current.has(key)) {
             const specs = buildLayerSpecs(layer, sourceId, state.id);
             for (const spec of specs) {
               if (map.getLayer(spec.id)) {
                 map.setLayoutProperty(spec.id, "visibility", wantVisible ? "visible" : "none");
               }
             }
+            continue;
           }
+
+          if (!wantVisible || loadingLayerIds.current.has(key)) continue;
+
+          tasks.push(async () => {
+            loadingLayerIds.current.add(key);
+            try {
+              const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
+              const data = (await res.json()) as FeatureCollection;
+              if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
+
+              if (!map.getSource(sourceId)) {
+                map.addSource(sourceId, { type: "geojson", data });
+                const specs = buildLayerSpecs(layer, sourceId, state.id);
+                for (const spec of specs) {
+                  if (!map.getLayer(spec.id)) map.addLayer(spec);
+                }
+
+                const interactionKey = `${state.id}:${layer.id}`;
+                if (!interactivityAttached.current.has(interactionKey)) {
+                  attachInteractivity(map, layer, popupRef, state.id);
+                  interactivityAttached.current.add(interactionKey);
+                }
+              }
+
+              loadedLayerIds.current.add(key);
+            } catch (err) {
+              console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
+            } finally {
+              loadingLayerIds.current.delete(key);
+            }
+          });
         }
       }
+
+      // Avoid a state-by-state waterfall while still limiting pressure on public GIS APIs.
+      const workerCount = Math.min(showAllStates ? 6 : 4, tasks.length);
+      let nextTask = 0;
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (nextTask < tasks.length) {
+          const task = tasks[nextTask++];
+          if (task) await task();
+        }
+      });
+      await Promise.all(workers);
     }
 
     syncLayers();
