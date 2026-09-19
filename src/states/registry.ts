@@ -109,4 +109,5 @@ export function getShowAllStates(): StateDefinition[] {
   return getEnabledStates().filter((s) => s.id !== "alaska");
 }
 
+// Deployment refresh: keep Vercel Git integration in sync with main.
 export const DEFAULT_STATE_ID = "washington";
