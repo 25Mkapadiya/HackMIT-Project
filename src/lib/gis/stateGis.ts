@@ -62,6 +62,40 @@ import { MT_LAYER_FETCHERS } from "@/states/montana/layerFetchers";
 import { MT_SOURCES } from "@/states/montana/sources";
 import { WY_LAYER_FETCHERS } from "@/states/wyoming/layerFetchers";
 import { WY_SOURCES } from "@/states/wyoming/sources";
+import { RI_LAYER_FETCHERS } from "@/states/rhodeisland/layerFetchers";
+import { RI_SOURCES } from "@/states/rhodeisland/sources";
+import { CT_LAYER_FETCHERS } from "@/states/connecticut/layerFetchers";
+import { CT_SOURCES } from "@/states/connecticut/sources";
+import { NY_LAYER_FETCHERS } from "@/states/newyork/layerFetchers";
+import { NY_SOURCES } from "@/states/newyork/sources";
+import { NJ_LAYER_FETCHERS } from "@/states/newjersey/layerFetchers";
+import { NJ_SOURCES } from "@/states/newjersey/sources";
+import { PA_LAYER_FETCHERS } from "@/states/pennsylvania/layerFetchers";
+import { PA_SOURCES } from "@/states/pennsylvania/sources";
+import { OH_LAYER_FETCHERS } from "@/states/ohio/layerFetchers";
+import { OH_SOURCES } from "@/states/ohio/sources";
+import { MI_LAYER_FETCHERS } from "@/states/michigan/layerFetchers";
+import { MI_SOURCES } from "@/states/michigan/sources";
+import { IN_LAYER_FETCHERS } from "@/states/indiana/layerFetchers";
+import { IN_SOURCES } from "@/states/indiana/sources";
+import { WI_LAYER_FETCHERS } from "@/states/wisconsin/layerFetchers";
+import { WI_SOURCES } from "@/states/wisconsin/sources";
+import { IA_LAYER_FETCHERS } from "@/states/iowa/layerFetchers";
+import { IA_SOURCES } from "@/states/iowa/sources";
+import { MN_LAYER_FETCHERS } from "@/states/minnesota/layerFetchers";
+import { MN_SOURCES } from "@/states/minnesota/sources";
+import { KS_LAYER_FETCHERS } from "@/states/kansas/layerFetchers";
+import { KS_SOURCES } from "@/states/kansas/sources";
+import { NE_LAYER_FETCHERS } from "@/states/nebraska/layerFetchers";
+import { NE_SOURCES } from "@/states/nebraska/sources";
+import { SD_LAYER_FETCHERS } from "@/states/southdakota/layerFetchers";
+import { SD_SOURCES } from "@/states/southdakota/sources";
+import { ND_LAYER_FETCHERS } from "@/states/northdakota/layerFetchers";
+import { ND_SOURCES } from "@/states/northdakota/sources";
+import { NM_LAYER_FETCHERS } from "@/states/newmexico/layerFetchers";
+import { NM_SOURCES } from "@/states/newmexico/sources";
+import { AZ_LAYER_FETCHERS } from "@/states/arizona/layerFetchers";
+import { AZ_SOURCES } from "@/states/arizona/sources";
 
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
@@ -726,6 +760,329 @@ const WYOMING_BUNDLE = buildStandardBundle({
   },
 });
 
+const RHODE_ISLAND_BUNDLE = buildStandardBundle({
+  fetchers: RI_LAYER_FETCHERS,
+  hifldTransmission: RI_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: RI_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: RI_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ISO-NE",
+  environmentalReviewNote:
+    "Rhode Island has no statewide zoning layer — municipal site-plan/zoning review is the primary local gating process, alongside large-load coordination with ISO New England and the serving utility (Rhode Island Energy). Rhode Island's compact geography simplifies utility analysis, but coastal resiliency and flood exposure should be weighted more heavily than in inland states.",
+  permittingNote: {
+    text: "Large facilities in Rhode Island typically require municipal site-plan/zoning review and large-load service coordination with Rhode Island Energy (the state's dominant utility) and ISO New England. No major statewide dedicated data-center tax exemption was identified from baseline research; general Commerce RI incentives and local tax-stabilization agreements would need project-by-project review. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ri-permitting-general",
+      name: "Rhode Island data-center siting — general regulatory context",
+      url: "https://commerceri.com",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const CONNECTICUT_BUNDLE = buildStandardBundle({
+  fetchers: CT_LAYER_FETCHERS,
+  hifldTransmission: CT_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: CT_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: CT_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "ISO-NE",
+  environmentalReviewNote:
+    "Connecticut has no statewide zoning layer — municipal site-plan/zoning review is the primary local gating process, alongside large-load coordination with ISO New England and the serving utility (Eversource Energy or United Illuminating).",
+  permittingNote: {
+    text: "Large facilities in Connecticut typically require municipal site-plan/zoning review and large-load service coordination with the serving utility (Eversource Energy or United Illuminating) and ISO New England. Connecticut operates a Data Center Tax Incentive Program (DECD) offering sales/use-tax and property-tax exemptions for qualifying projects meeting published investment thresholds ($50M in opportunity/enterprise zones, $200M elsewhere), with 20-30 year agreement terms — eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ct-permitting-general",
+      name: "Connecticut data-center siting — general regulatory context",
+      url: "https://portal.ct.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NEW_YORK_BUNDLE = buildStandardBundle({
+  fetchers: NY_LAYER_FETCHERS,
+  hifldTransmission: NY_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NY_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NY_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "NYISO",
+  environmentalReviewNote:
+    "New York has no statewide zoning layer — municipality-level review is the primary local gating process, alongside large-load coordination with the New York Independent System Operator (NYISO) and the serving utility. New York's energy and environmental regulatory framework is more complex than many peer states and should be reverified close to any siting decision.",
+  permittingNote: {
+    text: "Large facilities in New York typically require municipal land-use/zoning review and large-load service coordination with the serving utility (e.g. Con Edison, National Grid, NYSEG, RG&E, Central Hudson, Orange & Rockland, or LIPA) and NYISO. Potential incentives may be available through Empire State Development programs or local Industrial Development Agencies (IDAs), but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ny-permitting-general",
+      name: "New York data-center siting — general regulatory context",
+      url: "https://esd.ny.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NEW_JERSEY_BUNDLE = buildStandardBundle({
+  fetchers: NJ_LAYER_FETCHERS,
+  hifldTransmission: NJ_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NJ_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NJ_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM",
+  environmentalReviewNote:
+    "New Jersey has no statewide zoning dataset — municipal review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. New Jersey has one of the most active data-center policy environments in 2025-2026 (including the 2026 End Data Center Tax Credits Act), so regulatory and incentive status should be reverified close to any siting decision.",
+  permittingNote: {
+    text: "Large facilities in New Jersey typically require municipal site-plan/zoning review and large-load service coordination with the serving utility (PSE&G, JCP&L, Atlantic City Electric, Rockland Electric, or a municipal/cooperative system) and PJM. New Jersey enacted the End Data Center Tax Credits Act in August 2026, eliminating the remaining allocation of certain AI data-center tax credits under the Next NJ Program; general NJEDA and local PILOT programs would need project-by-project review. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "nj-permitting-general",
+      name: "New Jersey data-center siting — general regulatory context",
+      url: "https://nj.gov/njbusiness",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const PENNSYLVANIA_BUNDLE = buildStandardBundle({
+  fetchers: PA_LAYER_FETCHERS,
+  hifldTransmission: PA_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: PA_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: PA_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM",
+  environmentalReviewNote:
+    "Pennsylvania has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. Pennsylvania is one of PJM's most important generation and transmission states, but its Computer Data Center Equipment Exemption Program is subject to active legislative debate and possible repeal.",
+  permittingNote: {
+    text: "Large facilities in Pennsylvania typically require county or municipal site-plan/zoning review and large-load service coordination with the serving utility (PECO, PPL Electric Utilities, Duquesne Light, West Penn Power, Met-Ed, Penelec, Penn Power, or UGI Electric) and PJM. Pennsylvania's Computer Data Center Equipment Exemption Program provides a sales/use-tax exemption for qualifying certified data-center equipment (effective 2022), though 2026 bills have proposed repealing it — treat as a potential incentive only until current status is confirmed. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "pa-permitting-general",
+      name: "Pennsylvania data-center siting — general regulatory context",
+      url: "https://pa.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const OHIO_BUNDLE = buildStandardBundle({
+  fetchers: OH_LAYER_FETCHERS,
+  hifldTransmission: OH_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: OH_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: OH_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "PJM (with limited MISO influence near the western border)",
+  environmentalReviewNote:
+    "Ohio has no statewide zoning coverage — township/county/municipal review is the primary local gating process, alongside large-load coordination with PJM Interconnection and the serving utility. Central Ohio's rapid hyperscale growth is increasing competition for transmission capacity and utility infrastructure.",
+  permittingNote: {
+    text: "Large facilities in Ohio typically require township, county, or municipal zoning/site-plan review and large-load service coordination with the serving utility (AEP Ohio, FirstEnergy, Duke Energy Ohio, AES Ohio, Ohio Valley Electric Corporation, a municipal system, or a cooperative) and PJM (or MISO, near the western border). Potential incentives (job-creation credits, property-tax abatements, local enterprise zones) may be available through JobsOhio and local programs, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "oh-permitting-general",
+      name: "Ohio data-center siting — general regulatory context",
+      url: "https://jobsohio.com",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const MICHIGAN_BUNDLE = buildStandardBundle({
+  fetchers: MI_LAYER_FETCHERS,
+  hifldTransmission: MI_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MI_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MI_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO",
+  environmentalReviewNote:
+    "Michigan has no statewide zoning dataset — county/municipal review is the primary local gating process, alongside large-load coordination with MISO and the serving utility. Michigan operates under Great Lakes Compact requirements, so large water withdrawals face a more rigorous review framework (EGLE's Water Withdrawal Assessment Tool) than most states — Great Lakes access does not imply unrestricted withdrawal rights.",
+  permittingNote: {
+    text: "Large facilities in Michigan typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Consumers Energy, DTE Energy, Indiana Michigan Power, Upper Peninsula Power Company, a municipal utility, or a cooperative) and MISO. Michigan's Enterprise Data Center Sales & Use Tax Exemption (effective 2025) eliminates the 6% sales/use tax on qualifying equipment for projects meeting a $250M minimum investment, 30 qualified jobs, wage, municipal-water, clean-energy, and green-building requirements — eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "mi-permitting-general",
+      name: "Michigan data-center siting — general regulatory context",
+      url: "https://michiganbusiness.org",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const INDIANA_BUNDLE = buildStandardBundle({
+  fetchers: IN_LAYER_FETCHERS,
+  hifldTransmission: IN_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: IN_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: IN_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO/PJM",
+  environmentalReviewNote:
+    "Indiana has no statewide zoning dataset — local government review is the primary gating process, alongside large-load coordination with the serving utility and the applicable regional grid operator. Indiana sits between the MISO and PJM footprints and is frequently targeted for large industrial and hyperscale loads.",
+  permittingNote: {
+    text: "Large facilities in Indiana typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Duke Energy Indiana, Indiana Michigan Power, AES Indiana, CenterPoint Energy, NIPSCO, a municipal utility, or a cooperative) and the applicable MISO or PJM process. Indiana's Data Center Gross Retail and Use Tax Exemption can run up to 25 years (up to 50 years for investments exceeding $750M), with county-population-based investment thresholds from $25M to $150M — eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "in-permitting-general",
+      name: "Indiana data-center siting — general regulatory context",
+      url: "https://iedc.in.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const WISCONSIN_BUNDLE = buildStandardBundle({
+  fetchers: WI_LAYER_FETCHERS,
+  hifldTransmission: WI_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: WI_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: WI_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO",
+  environmentalReviewNote:
+    "Wisconsin has no statewide zoning database — municipal review is the primary local gating process, alongside large-load coordination with MISO and the serving utility. Wisconsin operates under Great Lakes Compact requirements and maintains unusually strong water-withdrawal reporting — Great Lakes/Lake Michigan proximity does not imply unrestricted withdrawal rights.",
+  permittingNote: {
+    text: "Large facilities in Wisconsin typically require municipal zoning/site-plan review and large-load service coordination with the serving utility (We Energies, Wisconsin Public Service, Alliant Energy, Madison Gas & Electric, Xcel Energy Wisconsin, or a Dairyland Power member system) and MISO. Wisconsin's Data Center Sales and Use Tax Exemption requires minimum investment thresholds that scale with county population ($150M in counties over 100,000; $100M in counties of 50,000-100,000; $50M in counties under 50,000) — eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "wi-permitting-general",
+      name: "Wisconsin data-center siting — general regulatory context",
+      url: "https://wedc.org",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const IOWA_BUNDLE = buildStandardBundle({
+  fetchers: IA_LAYER_FETCHERS,
+  hifldTransmission: IA_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: IA_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: IA_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO (with SPP-connected utilities near the western border)",
+  environmentalReviewNote:
+    "Iowa has no statewide zoning database — municipal review is the primary local gating process, alongside large-load coordination with MISO and the serving utility. Multiple Iowa cities and counties have begun adopting or considering local data-center regulations and temporary moratoria while updating ordinances (as of 2026), so local status should be reverified close to any siting decision.",
+  permittingNote: {
+    text: "Large facilities in Iowa typically require municipal zoning/site-plan review and large-load service coordination with the serving utility (MidAmerican Energy, Alliant Energy/Interstate Power and Light, ITC Midwest, a municipal utility, or a cooperative) and MISO. Iowa's Data Center Sales and Use Tax Incentives (Iowa Department of Revenue) provide an exemption pathway for eligible projects meeting a minimum $200M investment and other statutory requirements — eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ia-permitting-general",
+      name: "Iowa data-center siting — general regulatory context",
+      url: "https://revenue.iowa.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const MINNESOTA_BUNDLE = buildStandardBundle({
+  fetchers: MN_LAYER_FETCHERS,
+  hifldTransmission: MN_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MN_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MN_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO",
+  environmentalReviewNote:
+    "Minnesota has no statewide zoning dataset — municipal review is the primary local gating process, alongside large-load coordination with MISO and the serving utility. Substation headroom and utility-specific available capacity are generally not published and should always be treated as UNKNOWN rather than inferred from equipment size.",
+  permittingNote: {
+    text: "Large facilities in Minnesota typically require municipal zoning/site-plan review and large-load service coordination with the serving utility (Xcel Energy, Minnesota Power, Otter Tail Power, Rochester Public Utilities, a municipal utility, or a cooperative) and MISO. Potential incentives may be available through Minnesota business-development and sales-tax-exemption programs, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "mn-permitting-general",
+      name: "Minnesota data-center siting — general regulatory context",
+      url: "https://mn.gov/deed",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const KANSAS_BUNDLE = buildStandardBundle({
+  fetchers: KS_LAYER_FETCHERS,
+  hifldTransmission: KS_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: KS_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: KS_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "SPP",
+  environmentalReviewNote:
+    "Kansas has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with the Southwest Power Pool (SPP) and the serving utility. Kansas is one of the nation's leading wind-power states, and groundwater availability (particularly in portions of the Ogallala Aquifer) is an important project consideration, especially in western Kansas.",
+  permittingNote: {
+    text: "Large facilities in Kansas typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Evergy, Midwest Energy, a Kansas Electric Power Cooperative member, a municipal utility, or a rural cooperative) and SPP. Potential incentives may be available through Promoting Employment Across Kansas (PEAK), the High Performance Incentive Program (HPIP), Industrial Revenue Bonds, or local property-tax abatements, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ks-permitting-general",
+      name: "Kansas data-center siting — general regulatory context",
+      url: "https://www.kansascommerce.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NEBRASKA_BUNDLE = buildStandardBundle({
+  fetchers: NE_LAYER_FETCHERS,
+  hifldTransmission: NE_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NE_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NE_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "SPP (with MISO interfaces)",
+  environmentalReviewNote:
+    "Nebraska has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with SPP and the serving public-power provider. Nebraska is the only U.S. state served entirely by publicly owned electric utilities, which is frequently viewed as an advantage for large industrial and data-center customers.",
+  permittingNote: {
+    text: "Large facilities in Nebraska typically require county or municipal zoning/site-plan review and large-load service coordination with the serving public-power provider (Nebraska Public Power District, Omaha Public Power District, Lincoln Electric System, a municipal utility, or a public-power district) and SPP. Potential incentives may be available through Nebraska Advantage or successor economic-development programs, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ne-permitting-general",
+      name: "Nebraska data-center siting — general regulatory context",
+      url: "https://opportunity.nebraska.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const SOUTH_DAKOTA_BUNDLE = buildStandardBundle({
+  fetchers: SD_LAYER_FETCHERS,
+  hifldTransmission: SD_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: SD_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: SD_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO",
+  environmentalReviewNote:
+    "South Dakota has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with MISO and the serving utility. South Dakota is one of the strongest wind-resource states in the country and benefits from significant Missouri River hydroelectric generation.",
+  permittingNote: {
+    text: "Large facilities in South Dakota typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Xcel Energy, Black Hills Energy, Otter Tail Power, Montana-Dakota Utilities, an East River Electric or Missouri River Energy Services member, or a cooperative) and MISO. South Dakota has no corporate income tax and is generally recognized for a business-friendly tax environment; specific incentive eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "sd-permitting-general",
+      name: "South Dakota data-center siting — general regulatory context",
+      url: "https://sdgoed.com",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NORTH_DAKOTA_BUNDLE = buildStandardBundle({
+  fetchers: ND_LAYER_FETCHERS,
+  hifldTransmission: ND_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: ND_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: ND_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO (with limited SPP overlap)",
+  environmentalReviewNote:
+    "North Dakota has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with MISO and the serving utility. North Dakota is a major net electricity-exporting state with a generation profile combining coal, wind, and natural gas.",
+  permittingNote: {
+    text: "Large facilities in North Dakota typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Xcel Energy, Montana-Dakota Utilities, Otter Tail Power, Roughrider Electric Cooperative, Cass County Electric Cooperative, or a Basin Electric member cooperative) and MISO. Potential incentives may be available through state economic-development and primary-sector programs, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "nd-permitting-general",
+      name: "North Dakota data-center siting — general regulatory context",
+      url: "https://commerce.nd.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const NEW_MEXICO_BUNDLE = buildStandardBundle({
+  fetchers: NM_LAYER_FETCHERS,
+  hifldTransmission: NM_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NM_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NM_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (PNM, Xcel Energy New Mexico, El Paso Electric, or Southwestern Public Service), within the Western Interconnection",
+  environmentalReviewNote:
+    "New Mexico has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with the serving utility. Water-resource limitations administered under New Mexico's prior-appropriation system are one of the most important infrastructure siting considerations in the state, and groundwater availability can be a major constraint in certain basins.",
+  permittingNote: {
+    text: "Large facilities in New Mexico typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Public Service Company of New Mexico, Xcel Energy New Mexico, El Paso Electric, Southwestern Public Service, a cooperative, or a municipal system) within the Western Interconnection. Potential incentives may be available through the High Wage Jobs Tax Credit, Industrial Revenue Bonds, or Local Economic Development Act (LEDA) funds, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "nm-permitting-general",
+      name: "New Mexico data-center siting — general regulatory context",
+      url: "https://gonm.biz",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const ARIZONA_BUNDLE = buildStandardBundle({
+  fetchers: AZ_LAYER_FETCHERS,
+  hifldTransmission: AZ_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: AZ_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: AZ_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (APS, SRP, TEP, or UniSource Energy Services), within the Western Interconnection",
+  environmentalReviewNote:
+    "Arizona has no statewide zoning layer — county/municipal review is the primary local gating process, alongside large-load coordination with the serving utility. Water availability, regulated through the Arizona Department of Water Resources and its Active Management Areas, is one of the most important site-selection factors for Arizona data-center development, and reclaimed-water use is increasingly important for cooling strategies.",
+  permittingNote: {
+    text: "Large facilities in Arizona typically require county or municipal zoning/site-plan review and large-load service coordination with the serving utility (Arizona Public Service, Salt River Project, Tucson Electric Power, UniSource Energy Services, a municipal utility, a cooperative, or a tribal utility) within the Western Interconnection. Arizona offers data-center transaction-privilege-tax and equipment-tax exemptions along with other economic-development incentives, but eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "az-permitting-general",
+      name: "Arizona data-center siting — general regulatory context",
+      url: "https://www.azcommerce.com",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -757,6 +1114,23 @@ const BUNDLES: Record<string, StateGisBundle> = {
   idaho: IDAHO_BUNDLE,
   montana: MONTANA_BUNDLE,
   wyoming: WYOMING_BUNDLE,
+  rhodeisland: RHODE_ISLAND_BUNDLE,
+  connecticut: CONNECTICUT_BUNDLE,
+  newyork: NEW_YORK_BUNDLE,
+  newjersey: NEW_JERSEY_BUNDLE,
+  pennsylvania: PENNSYLVANIA_BUNDLE,
+  ohio: OHIO_BUNDLE,
+  michigan: MICHIGAN_BUNDLE,
+  indiana: INDIANA_BUNDLE,
+  wisconsin: WISCONSIN_BUNDLE,
+  iowa: IOWA_BUNDLE,
+  minnesota: MINNESOTA_BUNDLE,
+  kansas: KANSAS_BUNDLE,
+  nebraska: NEBRASKA_BUNDLE,
+  southdakota: SOUTH_DAKOTA_BUNDLE,
+  northdakota: NORTH_DAKOTA_BUNDLE,
+  newmexico: NEW_MEXICO_BUNDLE,
+  arizona: ARIZONA_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {
