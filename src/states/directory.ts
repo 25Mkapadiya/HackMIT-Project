@@ -49,12 +49,12 @@ export const US_STATES_DIRECTORY: StateDirectoryEntry[] = [
         51.229
       ],
       [
-        179.775,
+        -129.981,
         71.353
       ]
     ],
     "center": [
-      0.319,
+      -154.559,
       61.291
     ]
   },

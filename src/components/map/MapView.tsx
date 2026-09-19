@@ -8,7 +8,7 @@ import type { LayerDefinition } from "@/lib/types";
 import { getState, DEFAULT_STATE_ID } from "@/states/registry";
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
-import { BASEMAP_STYLE, emptyFeatureCollection } from "./mapStyle";
+import { BASEMAP_STYLE, US_MAX_BOUNDS, US_MIN_ZOOM, emptyFeatureCollection } from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
 import { buildPopupHtml } from "./popupContent";
 
@@ -22,6 +22,8 @@ export default function MapView() {
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
+  const focusAnimatingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
   const layerVisibility = useAppStore((s) => s.layerVisibility);
@@ -43,10 +45,36 @@ export default function MapView() {
       zoom: defaultState.defaultZoom,
       pitch: 0,
       maxPitch: 68,
+      maxBounds: US_MAX_BOUNDS,
+      minZoom: US_MIN_ZOOM,
+      renderWorldCopies: false,
       attributionControl: { compact: true },
     });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    const navigationControl = new maplibregl.NavigationControl({ visualizePitch: true });
+    map.addControl(navigationControl, "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "imperial", maxWidth: 120 }), "bottom-left");
+
+    // Repurpose the existing white compass button as a guided "focus active site"
+    // control once a data-center scenario exists. Before that, it keeps its normal
+    // north-reset behavior.
+    const compassButton = map
+      .getContainer()
+      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+    const handleCompassFocus = (event: MouseEvent) => {
+      const target = activeScenarioRef.current;
+      if (!target || focusAnimatingRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      focusAnimatingRef.current = true;
+      spiralFocusOnSite(map, target, () => {
+        focusAnimatingRef.current = false;
+      });
+    };
+    compassButton?.addEventListener("click", handleCompassFocus, true);
+
+    fitMinZoomToBounds(map);
+    map.on("resize", () => fitMinZoomToBounds(map));
 
     map.on("load", () => {
       map.addSource("proposed-points", { type: "geojson", data: emptyFeatureCollection() });
@@ -108,11 +136,36 @@ export default function MapView() {
 
     mapRef.current = map;
     return () => {
+      compassButton?.removeEventListener("click", handleCompassFocus, true);
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- keep the compass target + accessible label in sync with the active site ----
+  useEffect(() => {
+    const active = scenarios.find((scenario) => scenario.id === activeScenarioId) ?? null;
+    activeScenarioRef.current = active
+      ? { id: active.id, label: active.label, lng: active.lng, lat: active.lat }
+      : null;
+
+    if (!mapRef.current) return;
+    const compassButton = mapRef.current
+      .getContainer()
+      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+    if (!compassButton) return;
+
+    if (active) {
+      compassButton.title = `Focus on ${active.label}`;
+      compassButton.setAttribute("aria-label", `Focus on ${active.label}`);
+      compassButton.dataset.focusSite = "true";
+    } else {
+      compassButton.title = "Reset bearing to north";
+      compassButton.setAttribute("aria-label", "Reset bearing to north");
+      delete compassButton.dataset.focusSite;
+    }
+  }, [scenarios, activeScenarioId, mapReady]);
 
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
@@ -180,6 +233,8 @@ export default function MapView() {
 
     async function syncLayers() {
       for (const layer of state!.layers) {
+        // Visual raster layers are loaded directly by MapLibre rather than through the GeoJSON API.
+        if (layer.geometryType === "raster") continue;
         const wantVisible = Boolean(layerVisibility[layer.id]);
         const sourceId = `src-${layer.id}`;
 
@@ -217,6 +272,113 @@ export default function MapView() {
     }
 
     syncLayers();
+  }, [mapReady, layerVisibility, activeStateId]);
+
+  // ---- U.S. visual forest cover ----
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const visible = Boolean(layerVisibility["forest-cover"]);
+    const layerId = "forest-cover-vector";
+
+    // Reuse the CARTO basemap's vector land-cover source so forest edges stay
+    // crisp and map-like at every zoom instead of looking like a scientific raster.
+    if (!map.getLayer(layerId) && map.getSource("carto")) {
+      map.addLayer(
+        {
+          id: layerId,
+          type: "fill",
+          source: "carto",
+          "source-layer": "landcover",
+          filter: ["==", "class", "wood"],
+          minzoom: 4,
+          paint: {
+            "fill-color": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, "#234b31",
+              7, "#2f6842",
+              10, "#3b7d4e",
+              13, "#4a8d59"
+            ],
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, 0.38,
+              7, 0.48,
+              10, 0.56,
+              13, 0.62
+            ],
+            "fill-antialias": true
+          },
+          layout: { visibility: visible ? "visible" : "none" },
+        },
+        "proposed-points-glow"
+      );
+    } else if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    }
+  }, [mapReady, layerVisibility, activeStateId]);
+
+  // ---- U.S.-only terrain / mountains: cached USGS National Map shaded relief ----
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const visible = Boolean(layerVisibility["terrain-hillshade"]);
+    const sourceId = "usgs-shaded-relief";
+    const layerId = "terrain-relief-raster";
+
+    // Never enable 3D terrain. This stays a flat cartographic relief overlay.
+    if (map.getTerrain()) map.setTerrain(null);
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "raster",
+        tiles: [
+          "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}",
+        ],
+        tileSize: 256,
+        minzoom: 4,
+        maxzoom: 14,
+        bounds: [-179.9, 15, -63, 72],
+        attribution: "Shaded relief © USGS The National Map / 3DEP",
+      });
+    }
+
+    if (!map.getLayer(layerId)) {
+      map.addLayer(
+        {
+          id: layerId,
+          type: "raster",
+          source: sourceId,
+          minzoom: 4,
+          maxzoom: 15,
+          paint: {
+            "raster-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, 0.15,
+              7, 0.20,
+              10, 0.24,
+              13, 0.20
+            ],
+            "raster-resampling": "linear",
+            "raster-fade-duration": 0,
+            "raster-saturation": -1,
+            "raster-contrast": 0.02,
+            "raster-brightness-min": 0.20,
+            "raster-brightness-max": 0.86,
+          },
+          layout: { visibility: visible ? "visible" : "none" },
+        },
+        "proposed-points-glow"
+      );
+    } else {
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    }
   }, [mapReady, layerVisibility, activeStateId]);
 
   // ---- sync proposed scenarios (points + 3D campus) ----
@@ -266,6 +428,103 @@ export default function MapView() {
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over
   // the `absolute` utility class and collapses this container to zero height.
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
+}
+
+
+function spiralFocusOnSite(
+  map: maplibregl.Map,
+  site: { lng: number; lat: number },
+  onDone: () => void
+) {
+  const interactionHandlers = [
+    map.dragPan,
+    map.scrollZoom,
+    map.boxZoom,
+    map.dragRotate,
+    map.keyboard,
+    map.doubleClickZoom,
+    map.touchZoomRotate,
+  ];
+  const previouslyEnabled = interactionHandlers.map((handler) => handler.isEnabled());
+
+  for (const handler of interactionHandlers) handler.disable();
+  map.stop();
+
+  const startBearing = map.getBearing();
+  const currentZoom = map.getZoom();
+  const firstZoom = Math.max(10.8, Math.min(13.2, currentZoom + 2.4));
+  const finalZoom = Math.max(15.2, Math.min(16.4, firstZoom + 3.1));
+
+  const restoreInteraction = () => {
+    interactionHandlers.forEach((handler, index) => {
+      if (previouslyEnabled[index]) handler.enable();
+    });
+    onDone();
+  };
+
+  const secondPhase = () => {
+    map.easeTo({
+      center: [site.lng, site.lat],
+      zoom: finalZoom,
+      bearing: startBearing + 320,
+      pitch: 52,
+      duration: 1250,
+      offset: [0, 36],
+      easing: (t) => 1 - Math.pow(1 - t, 3),
+      essential: true,
+    });
+    map.once("moveend", restoreInteraction);
+  };
+
+  map.easeTo({
+    center: [site.lng, site.lat],
+    zoom: firstZoom,
+    bearing: startBearing + 155,
+    pitch: 30,
+    duration: 950,
+    offset: [0, 18],
+    easing: (t) => t * t * (3 - 2 * t),
+    essential: true,
+  });
+  map.once("moveend", secondPhase);
+}
+
+// A fixed minZoom that "roughly" fits US_MAX_BOUNDS only works for one window width — on a
+// wider viewport (or with the sidebar taking less room) the box ends up smaller than the
+// screen, and maxBounds' pan clamp can't stop you zooming out past that, leaving the map
+// floating in blank space. Recomputing the floor from the actual container size keeps the
+// box flush with the viewport at any window size.
+//
+// map.cameraForBounds()/fitBounds() intentionally compute a "contain" fit (the whole box
+// stays fully visible, so the *less* constraining axis is left with blank margin) — that's
+// backwards for a pan/zoom floor, which needs a "cover" fit (the box fills the viewport, so
+// the *more* constraining axis wins). MapLibre has no built-in "cover" helper, so this does
+// the Web Mercator math directly: the zoom needed to make each axis exactly fill the
+// container, then takes the larger (more-zoomed-in) of the two.
+function mercatorYFraction(lat: number) {
+  const rad = (lat * Math.PI) / 180;
+  return (1 - Math.log(Math.tan(Math.PI / 4 + rad / 2)) / Math.PI) / 2;
+}
+
+const MAPLIBRE_TILE_SIZE = 512;
+
+function coverZoomForBounds(
+  bounds: [[number, number], [number, number]],
+  width: number,
+  height: number
+) {
+  const lngFraction = Math.abs(bounds[1][0] - bounds[0][0]) / 360;
+  const latFraction = Math.abs(mercatorYFraction(bounds[1][1]) - mercatorYFraction(bounds[0][1]));
+  const zoomForWidth = Math.log2(width / (MAPLIBRE_TILE_SIZE * lngFraction));
+  const zoomForHeight = Math.log2(height / (MAPLIBRE_TILE_SIZE * latFraction));
+  return Math.max(zoomForWidth, zoomForHeight);
+}
+
+function fitMinZoomToBounds(map: maplibregl.Map) {
+  const { width, height } = map.getContainer().getBoundingClientRect();
+  if (width < 1 || height < 1) return;
+  const zoom = coverZoomForBounds(US_MAX_BOUNDS, width, height);
+  map.setMinZoom(Math.max(zoom, US_MIN_ZOOM));
 }
 
 function attachInteractivity(

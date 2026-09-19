@@ -126,6 +126,22 @@ export const WA_SOURCES = {
     refreshFrequency: "Semiannual BDC collection",
     methodology: "Retail fixed-broadband availability by provider/technology at a location — a proxy for connectivity, not long-haul fiber routes. Requires FCC_BDC_API_KEY.",
   },
+  cartoForestCover: {
+    id: "carto-osm-forest-cover",
+    name: "CARTO Vector Basemap — OSM Landcover (wood)",
+    url: "https://tiles.basemaps.cartocdn.com/vector/carto.streets/v1/tiles.json",
+    license: "CARTO basemap / OpenStreetMap-derived data (ODbL attribution applies)",
+    refreshFrequency: "Basemap provider refresh cycle",
+    methodology: "Visual forest overlay using the basemap vector landcover layer filtered to the 'wood' class. This is a cartographic forest proxy, not an authoritative forestry inventory.",
+  },
+  usgsShadedRelief: {
+    id: "usgs-shaded-relief",
+    name: "USGS The National Map — Shaded Relief",
+    url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer",
+    license: "Public domain (USGS)",
+    refreshFrequency: "USGS cached basemap service",
+    methodology: "Cached shaded-relief tiles derived from 3DEP at large/medium scales, displayed as a low-opacity terrain context layer with no 3D extrusion.",
+  },
   wsdotHighways: {
     id: "wsdot-functional-class",
     name: "WSDOT — State Highway Functional Classification",

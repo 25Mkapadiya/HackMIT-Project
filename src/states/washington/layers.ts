@@ -59,7 +59,8 @@ export const WA_LAYERS: LayerDefinition[] = [
   },
   {
     id: "hydrography-waterbodies",
-    name: "Lakes & Reservoirs",
+    name: "Water Bodies (Lakes & Reservoirs)",
+    shortName: "Water Bodies",
     category: "water",
     geometryType: "polygon",
     source: WA_SOURCES.usgsNhdWaterbody,
@@ -146,6 +147,34 @@ export const WA_LAYERS: LayerDefinition[] = [
     ],
   },
 
+  {
+    id: "forest-cover",
+    name: "Forest / Tree Canopy",
+    shortName: "Forests",
+    category: "environment",
+    geometryType: "raster",
+    source: WA_SOURCES.cartoForestCover,
+    confidence: "proxy",
+    description:
+      "Visual forest/wood land-cover polygons from the CARTO basemap's OpenStreetMap-derived landcover layer. Optimized for clear map reading; not an authoritative forestry inventory.",
+    defaultVisible: false,
+    color: "#4f7f50",
+    legend: [{ label: "Tree canopy / forest cover", color: "#4f7f50", swatch: "fill" }],
+  },
+  {
+    id: "terrain-hillshade",
+    name: "Terrain / Mountains",
+    shortName: "Terrain",
+    category: "environment",
+    geometryType: "raster",
+    source: WA_SOURCES.usgsShadedRelief,
+    confidence: "fact",
+    description:
+      "USGS The National Map cached shaded relief, derived from 3DEP at large and medium scales. Rendered as a subtle flat overlay for mountain and terrain context.",
+    defaultVisible: false,
+    color: "#8d8a82",
+    legend: [{ label: "Shaded terrain relief", color: "#8d8a82", swatch: "fill" }],
+  },
   {
     id: "state-highways",
     name: "State Highways",

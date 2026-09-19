@@ -55,7 +55,7 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
   const toggleLayer = useAppStore((s) => s.toggleLayer);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const stateLayers = getState(activeStateId)?.layers ?? [];
-  const [openCategories, setOpenCategories] = useState<Set<LayerCategory>>(new Set(["power", "water"]));
+  const [openCategories, setOpenCategories] = useState<Set<LayerCategory>>(new Set(["power", "water", "environment"]));
 
   function toggleCategory(cat: LayerCategory) {
     setOpenCategories((prev) => {
