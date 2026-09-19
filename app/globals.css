@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+}
+
+* {
+  border-color: theme("colors.base.700");
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2b3a52;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a4d6b;
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgba(10, 13, 18, 0.7) !important;
+  color: #7d8ba0 !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: #b8c3d1 !important;
+}
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  z-index: 10;
+}
+.maplibregl-popup-content {
+  background: #131924 !important;
+  color: #eef2f7 !important;
+  border: 1px solid #22304487;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  padding: 0 !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: #131924 !important;
+  border-bottom-color: #131924 !important;
+}
+.maplibregl-popup-close-button {
+  color: #7d8ba0 !important;
+  font-size: 16px !important;
+  padding: 4px 8px !important;
+}
+
+@layer utilities {
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(19, 25, 36, 0.92) 0%, rgba(15, 20, 27, 0.92) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

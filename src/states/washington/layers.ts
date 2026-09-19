@@ -1,0 +1,212 @@
+import type { LayerDefinition } from "@/lib/types";
+import { WA_SOURCES } from "./sources";
+
+/**
+ * Full layer registry for Washington. This is the single place that maps a
+ * layer id to its category, styling, source, and API endpoint — the map,
+ * the layer control panel, and the legend all read from this list rather
+ * than hard-coding Washington specifics.
+ */
+export const WA_LAYERS: LayerDefinition[] = [
+  // ---------------------------------------------------------------- POWER
+  {
+    id: "transmission-lines",
+    name: "BPA Transmission Lines",
+    shortName: "Transmission",
+    category: "power",
+    geometryType: "line",
+    source: WA_SOURCES.bpaTransmission,
+    confidence: "fact",
+    description: "Bonneville Power Administration high-voltage transmission line geometry and voltage class.",
+    defaultVisible: true,
+    endpoint: "/api/gis/transmission-lines",
+    legend: [
+      { label: "500 kV+", color: "#ff5470", swatch: "line", lineWidth: 3 },
+      { label: "230–499 kV", color: "#f2b93b", swatch: "line", lineWidth: 2.5 },
+      { label: "115–229 kV", color: "#f2d98b", swatch: "line", lineWidth: 2 },
+      { label: "< 115 kV / unknown", color: "#8fa3bf", swatch: "line", lineWidth: 1.5 },
+    ],
+  },
+  {
+    id: "utility-territories",
+    name: "Electric Utility Service Areas",
+    shortName: "Utility Territories",
+    category: "power",
+    geometryType: "polygon",
+    source: WA_SOURCES.waUtilityTerritories,
+    confidence: "proxy",
+    description:
+      "Informational utility service area boundaries compiled by WA Ecology/UTC. Not an official service determination.",
+    defaultVisible: false,
+    endpoint: "/api/gis/utility-territories",
+    color: "#5b7a9d",
+    legend: [{ label: "Utility territory boundary", color: "#5b7a9d", swatch: "fill" }],
+  },
+
+  // ---------------------------------------------------------------- WATER
+  {
+    id: "hydrography-rivers",
+    name: "Rivers & Streams",
+    category: "water",
+    geometryType: "line",
+    source: WA_SOURCES.usgsNhdFlowline,
+    confidence: "fact",
+    description: "USGS National Hydrography Dataset flowlines (small-scale).",
+    defaultVisible: true,
+    endpoint: "/api/gis/hydrography-rivers",
+    color: "#3ba9f2",
+    legend: [{ label: "River / stream", color: "#3ba9f2", swatch: "line", lineWidth: 1.5 }],
+  },
+  {
+    id: "hydrography-waterbodies",
+    name: "Lakes & Reservoirs",
+    category: "water",
+    geometryType: "polygon",
+    source: WA_SOURCES.usgsNhdWaterbody,
+    confidence: "fact",
+    description: "USGS National Hydrography Dataset waterbody polygons (small-scale).",
+    defaultVisible: true,
+    endpoint: "/api/gis/hydrography-waterbodies",
+    color: "#1f6fa8",
+    legend: [{ label: "Lake / reservoir", color: "#1f6fa8", swatch: "fill" }],
+  },
+  {
+    id: "usgs-gauges",
+    name: "USGS Streamflow Gauges",
+    category: "water",
+    geometryType: "point",
+    source: WA_SOURCES.usgsNwisGauges,
+    confidence: "fact",
+    description: "Active USGS surface-water monitoring stations with current discharge readings.",
+    defaultVisible: false,
+    endpoint: "/api/gis/usgs-gauges",
+    color: "#63d4ff",
+    legend: [{ label: "Active gauge", color: "#63d4ff", swatch: "circle" }],
+  },
+  {
+    id: "water-diversions",
+    name: "Water Right Diversions",
+    category: "water",
+    geometryType: "point",
+    source: WA_SOURCES.waWaterDiversions,
+    confidence: "fact",
+    description: "Permitted water right diversion points (WA Dept. of Ecology).",
+    defaultVisible: false,
+    endpoint: "/api/gis/water-diversions",
+    color: "#2ee6c8",
+    legend: [{ label: "Water right diversion", color: "#2ee6c8", swatch: "circle" }],
+  },
+  {
+    id: "drought-areas",
+    name: "Drought Declaration Areas",
+    category: "water",
+    geometryType: "polygon",
+    source: WA_SOURCES.waDroughtAreas,
+    confidence: "fact",
+    description: "State-declared drought areas (WA Dept. of Ecology).",
+    defaultVisible: false,
+    endpoint: "/api/gis/drought-areas",
+    color: "#c9722f",
+    legend: [{ label: "Drought-declared area", color: "#c9722f", swatch: "fill" }],
+  },
+
+  // --------------------------------------------------------- CONNECTIVITY
+  {
+    id: "colocation-facilities",
+    name: "Colocation / Interconnection Facilities",
+    shortName: "Colo Facilities",
+    category: "connectivity",
+    geometryType: "point",
+    source: WA_SOURCES.peeringDb,
+    confidence: "fact",
+    description:
+      "PeeringDB-listed carrier hotels and colocation facilities — a proxy for interconnection density, not a survey of long-haul fiber routes.",
+    defaultVisible: true,
+    endpoint: "/api/gis/colocation-facilities",
+    color: "#9b6ef2",
+    legend: [{ label: "Colocation / IX facility", color: "#9b6ef2", swatch: "circle" }],
+  },
+
+  // ----------------------------------------------------------- ENVIRONMENT
+  {
+    id: "flood-zones",
+    name: "FEMA Flood Hazard Zones",
+    shortName: "Flood Zones",
+    category: "environment",
+    geometryType: "polygon",
+    source: WA_SOURCES.femaNfhl,
+    confidence: "fact",
+    description: "Effective FEMA National Flood Hazard Layer zones, where mapped.",
+    defaultVisible: false,
+    endpoint: "/api/gis/flood-zones",
+    color: "#e0524a",
+    legend: [
+      { label: "High risk (A/AE/V zones)", color: "#e0524a", swatch: "fill" },
+      { label: "Moderate/minimal (X/other)", color: "#e0a84a", swatch: "fill" },
+    ],
+  },
+
+  {
+    id: "state-highways",
+    name: "State Highways",
+    category: "environment",
+    geometryType: "line",
+    source: WA_SOURCES.wsdotHighways,
+    confidence: "fact",
+    description: "WSDOT state route centerlines, classified by federal functional class (interstate/arterial/etc).",
+    defaultVisible: false,
+    endpoint: "/api/gis/state-highways",
+    color: "#c9d3e0",
+    legend: [{ label: "State highway / route", color: "#c9d3e0", swatch: "line", lineWidth: 1.5 }],
+  },
+
+  // -------------------------------------------------------------- COMMUNITY
+  {
+    id: "population-tracts",
+    name: "Census Tract Boundaries",
+    category: "community",
+    geometryType: "polygon",
+    source: WA_SOURCES.censusTiger,
+    confidence: "fact",
+    description: "US Census tract boundaries, used for population-proximity estimates.",
+    defaultVisible: false,
+    endpoint: "/api/gis/population-tracts",
+    color: "#6b7f99",
+    legend: [{ label: "Census tract boundary", color: "#6b7f99", swatch: "line" }],
+  },
+
+  // ----------------------------------------------------- EXISTING INFRA
+  {
+    id: "power-plants",
+    name: "Power Generation Facilities",
+    shortName: "Generation",
+    category: "existing_infrastructure",
+    geometryType: "point",
+    source: WA_SOURCES.eia,
+    confidence: "unknown",
+    description:
+      "Nearby generating facilities from EIA. Requires a server-side EIA_API_KEY — shown as unavailable until configured.",
+    defaultVisible: true,
+    endpoint: "/api/gis/power-plants",
+    color: "#f2b93b",
+    legend: [{ label: "Generating facility", color: "#f2b93b", swatch: "circle" }],
+  },
+  {
+    id: "data-centers",
+    name: "Known Data Center Campuses",
+    shortName: "Data Centers",
+    category: "existing_infrastructure",
+    geometryType: "point",
+    source: WA_SOURCES.curatedDataCenters,
+    confidence: "proxy",
+    description: "Hand-curated, illustrative list of publicly reported WA data center campuses. Not exhaustive.",
+    defaultVisible: true,
+    endpoint: "/api/gis/data-centers",
+    color: "#8fa3bf",
+    legend: [{ label: "Existing data center campus", color: "#8fa3bf", swatch: "circle" }],
+  },
+];
+
+export function getWaLayer(id: string): LayerDefinition | undefined {
+  return WA_LAYERS.find((l) => l.id === id);
+}
