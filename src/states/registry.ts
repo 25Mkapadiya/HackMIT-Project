@@ -46,6 +46,9 @@ import { SOUTH_DAKOTA } from "./southdakota";
 import { NORTH_DAKOTA } from "./northdakota";
 import { NEW_MEXICO } from "./newmexico";
 import { ARIZONA } from "./arizona";
+import { NEVADA } from "./nevada";
+import { UTAH } from "./utah";
+import { COLORADO } from "./colorado";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -110,6 +113,9 @@ const LIVE_STATES: StateDefinition[] = [
   NORTH_DAKOTA,
   NEW_MEXICO,
   ARIZONA,
+  NEVADA,
+  UTAH,
+  COLORADO,
 ];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(
@@ -143,4 +149,5 @@ export function getShowAllStates(): StateDefinition[] {
   return getEnabledStates().filter((s) => s.id !== "alaska");
 }
 
+// Deployment refresh: keep Vercel Git integration in sync with main.
 export const DEFAULT_STATE_ID = "washington";
