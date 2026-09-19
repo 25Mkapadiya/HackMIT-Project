@@ -202,24 +202,76 @@ export default function MapView() {
     syncLayers();
   }, [mapReady, layerVisibility]);
 
-  // ---- U.S. cartographic forest cover ----
+  // ---- U.S. visual forest cover ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
     const visible = Boolean(layerVisibility["forest-cover"]);
-    const sourceId = "forest-canopy-raster";
-    const layerId = "forest-cover-raster";
+    const layerId = "forest-cover-vector";
+
+    // Reuse the CARTO basemap's vector land-cover source so forest edges stay
+    // crisp and map-like at every zoom instead of looking like a scientific raster.
+    if (!map.getLayer(layerId) && map.getSource("carto")) {
+      map.addLayer(
+        {
+          id: layerId,
+          type: "fill",
+          source: "carto",
+          "source-layer": "landcover",
+          filter: ["==", "class", "wood"],
+          minzoom: 4,
+          paint: {
+            "fill-color": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, "#234b31",
+              7, "#2f6842",
+              10, "#3b7d4e",
+              13, "#4a8d59"
+            ],
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, 0.38,
+              7, 0.48,
+              10, 0.56,
+              13, 0.62
+            ],
+            "fill-antialias": true
+          },
+          layout: { visibility: visible ? "visible" : "none" },
+        },
+        "proposed-points-glow"
+      );
+    } else if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    }
+  }, [mapReady, layerVisibility, activeStateId]);
+
+  // ---- U.S.-only terrain / mountains: cached USGS National Map shaded relief ----
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const visible = Boolean(layerVisibility["terrain-hillshade"]);
+    const sourceId = "usgs-shaded-relief";
+    const layerId = "terrain-relief-raster";
+
+    // Never enable 3D terrain. This stays a flat cartographic relief overlay.
+    if (map.getTerrain()) map.setTerrain(null);
 
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
         type: "raster",
         tiles: [
-          "https://tiles.arcgis.com/tiles/9lDFdeC4JIBgML6L/arcgis/rest/services/Tree_Canopy_Cover/MapServer/tile/{z}/{y}/{x}",
+          "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}",
         ],
         tileSize: 256,
         minzoom: 4,
-        maxzoom: 13,
-        attribution: "Tree canopy © USDA Forest Service",
+        maxzoom: 14,
+        bounds: [-179.9, 15, -63, 72],
+        attribution: "Shaded relief © USGS The National Map / 3DEP",
       });
     }
 
@@ -230,13 +282,22 @@ export default function MapView() {
           type: "raster",
           source: sourceId,
           minzoom: 4,
+          maxzoom: 15,
           paint: {
-            "raster-opacity": 0.46,
+            "raster-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4, 0.15,
+              7, 0.20,
+              10, 0.24,
+              13, 0.20
+            ],
             "raster-resampling": "linear",
-            "raster-fade-duration": 180,
-            "raster-saturation": -0.08,
-            "raster-contrast": 0.08,
-            "raster-brightness-min": 0.08,
+            "raster-fade-duration": 0,
+            "raster-saturation": -1,
+            "raster-contrast": 0.02,
+            "raster-brightness-min": 0.20,
             "raster-brightness-max": 0.86,
           },
           layout: { visibility: visible ? "visible" : "none" },
@@ -246,54 +307,7 @@ export default function MapView() {
     } else {
       map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
     }
-  }, [mapReady, layerVisibility]);
-
-  // ---- U.S.-only terrain / mountains: subtle USGS 3DEP multidirectional relief ----
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-    const visible = Boolean(layerVisibility["terrain-hillshade"]);
-    const sourceId = "usgs-3dep-relief";
-    const layerId = "terrain-relief-raster";
-
-    // Make sure the previous global 3D terrain state can never leak through after hot reloads.
-    if (map.getTerrain()) map.setTerrain(null);
-
-    if (!map.getSource(sourceId)) {
-      map.addSource(sourceId, {
-        type: "raster",
-        tiles: ["/api/tiles/terrain/{z}/{x}/{y}"],
-        tileSize: 256,
-        minzoom: 4,
-        maxzoom: 15,
-        attribution: "Terrain © USGS 3D Elevation Program",
-      });
-    }
-
-    if (!map.getLayer(layerId)) {
-      map.addLayer(
-        {
-          id: layerId,
-          type: "raster",
-          source: sourceId,
-          minzoom: 4,
-          paint: {
-            "raster-opacity": 0.28,
-            "raster-resampling": "linear",
-            "raster-fade-duration": 160,
-            "raster-saturation": -1,
-            "raster-contrast": 0.04,
-            "raster-brightness-min": 0.18,
-            "raster-brightness-max": 0.88,
-          },
-          layout: { visibility: visible ? "visible" : "none" },
-        },
-        "proposed-points-glow"
-      );
-    } else {
-      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
-    }
-  }, [mapReady, layerVisibility]);
+  }, [mapReady, layerVisibility, activeStateId]);
 
   // ---- sync proposed scenarios (points + 3D campus) ----
   useEffect(() => {
