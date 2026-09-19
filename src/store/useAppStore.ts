@@ -33,7 +33,7 @@ interface AppState {
   scenarios: ScenarioConfig[];
   activeScenarioId: string | null;
   analysisByScenario: Record<string, AnalysisState>;
-  addScenario: (lng: number, lat: number) => string;
+  addScenario: (lng: number, lat: number, stateId?: string) => string;
   updateScenario: (id: string, patch: Partial<ScenarioConfig>) => void;
   removeScenario: (id: string) => void;
   setActiveScenario: (id: string | null) => void;
@@ -97,13 +97,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeScenarioId: null,
   analysisByScenario: {},
 
-  addScenario: (lng, lat) => {
+  addScenario: (lng, lat, stateId) => {
     const id = nextScenarioId();
     const idx = get().scenarios.length % SITE_LABELS.length;
     const scenario: ScenarioConfig = {
       id,
       label: SITE_LABELS[idx] ?? `Site ${idx + 1}`,
-      stateId: get().activeStateId,
+      stateId: stateId ?? get().activeStateId,
       lng,
       lat,
       createdAt: new Date().toISOString(),
