@@ -100,7 +100,7 @@ export default function TopBar() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && filteredStates.length > 0) {
                   e.preventDefault();
-                  chooseState(filteredStates[0].id);
+                  chooseState(filteredStates[0]!.id);
                 } else if (e.key === "Escape") {
                   setStateSearchOpen(false);
                   setStateQuery("");
