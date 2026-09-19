@@ -1,6 +1,7 @@
 import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
 import { queryArcGisGeoJSON, type Bbox } from "./arcgis";
 import { cached, TTL } from "@/lib/cache/memoryCache";
+import * as turf from "@turf/turf";
 import { NATIONAL_SOURCES } from "./nationalSources";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
@@ -207,6 +208,26 @@ export async function fetchHifldTransmissionLines(bbox: Bbox): Promise<FeatureCo
   };
 }
 
+/**
+ * Service-territory layers contain nested/overlapping polygons (e.g. a municipal
+ * utility inside a larger IOU territory). polygonContaining() returns the first
+ * containing polygon, so order smallest-area first: the most specific serving
+ * utility wins instead of whichever large background polygon comes back first.
+ */
+export function sortSmallestAreaFirst<T extends Feature<Geometry, any>>(features: T[]): T[] {
+  const areaOf = (f: T): number => {
+    try {
+      return f.geometry ? turf.area(f as any) : Infinity;
+    } catch {
+      return Infinity;
+    }
+  };
+  return features
+    .map((f) => ({ f, a: areaOf(f) }))
+    .sort((x, y) => x.a - y.a)
+    .map((x) => x.f);
+}
+
 interface HifldTerritoryRaw {
   NAME?: string;
   STATE?: string;
@@ -222,13 +243,15 @@ export async function fetchHifldUtilityTerritories(bbox: Bbox): Promise<FeatureC
   );
   return {
     type: "FeatureCollection",
-    features: fc.features.map((f) => ({
-      ...f,
-      properties: {
-        Name: f.properties?.NAME ?? null,
-        State: f.properties?.STATE ?? null,
-        UtilityType: f.properties?.TYPE ?? null,
-      },
-    })),
+    features: sortSmallestAreaFirst(
+      fc.features.map((f) => ({
+        ...f,
+        properties: {
+          Name: f.properties?.NAME ?? null,
+          State: f.properties?.STATE ?? null,
+          UtilityType: f.properties?.TYPE ?? null,
+        },
+      }))
+    ),
   };
 }

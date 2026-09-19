@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { STATE_REGISTRY, getState, getEnabledStates } from "@/states/registry";
 
@@ -13,6 +14,9 @@ export default function TopBar() {
   const setActiveStateId = useAppStore((s) => s.setActiveStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
   const setShowAllStates = useAppStore((s) => s.setShowAllStates);
+  const [stateQuery, setStateQuery] = useState("");
+  const [stateSearchOpen, setStateSearchOpen] = useState(false);
+  const stateSearchRef = useRef<HTMLDivElement>(null);
 
   const activeState = getState(activeStateId);
   const implementedStates = getEnabledStates();
@@ -22,6 +26,35 @@ export default function TopBar() {
       ? "Data Center Siting Intelligence"
       : `${activeState?.name ?? "Selected state"} — coming soon, showing Washington's live analysis`;
 
+  const filteredStates = useMemo(() => {
+    const query = stateQuery.trim().toLowerCase();
+    if (!query) return STATE_REGISTRY;
+
+    return STATE_REGISTRY.filter((state) => {
+      const stateName = state.name.toLowerCase();
+      const stateId = state.id.toLowerCase();
+      return stateName.includes(query) || stateId.includes(query);
+    });
+  }, [stateQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (stateSearchRef.current && !stateSearchRef.current.contains(event.target as Node)) {
+        setStateSearchOpen(false);
+        setStateQuery("");
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const chooseState = (stateId: string) => {
+    setActiveStateId(stateId);
+    setStateQuery("");
+    setStateSearchOpen(false);
+  };
+
   return (
     <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between gap-4 px-4 h-14 glass-panel border-b border-base-700">
       <div className="flex items-center gap-3 min-w-0">
@@ -30,24 +63,93 @@ export default function TopBar() {
             G
           </div>
           <div className="leading-tight">
-            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">Grid &amp; Ground</div>
+            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">GEO: Geographical Energy Outcomes</div>
             <div className="text-[9.5px] text-ink-500 tracking-wide -mt-0.5 truncate max-w-[240px]">{subtitle}</div>
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 ml-3 pl-3 border-l border-base-700">
-          <span className={`h-1.5 w-1.5 rounded-full ${showAllStates || activeState?.enabled ? "bg-emerald-400" : "bg-amber-400"}`} />
-          <select
-            value={activeStateId}
-            onChange={(e) => setActiveStateId(e.target.value)}
-            className="bg-transparent text-[11px] text-ink-300 hover:text-ink-100 focus:outline-none cursor-pointer"
+
+        <div
+          ref={stateSearchRef}
+          className="relative hidden sm:block ml-3 pl-3 border-l border-base-700"
+        >
+          <div
+            className={`flex items-center gap-2 h-8 w-[210px] rounded-md border px-2.5 transition-colors ${
+              stateSearchOpen
+                ? "border-base-500 bg-base-900"
+                : "border-base-700 bg-base-900/70 hover:border-base-600"
+            }`}
           >
-            {STATE_REGISTRY.map((s) => (
-              <option key={s.id} value={s.id} className="bg-base-900 text-ink-100">
-                {s.name}
-                {s.enabled ? "" : " — coming soon"}
-              </option>
-            ))}
-          </select>
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className="h-3.5 w-3.5 shrink-0 text-ink-500"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              value={stateSearchOpen ? stateQuery : ""}
+              onFocus={() => setStateSearchOpen(true)}
+              onChange={(e) => {
+                setStateQuery(e.target.value);
+                setStateSearchOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && filteredStates.length > 0) {
+                  e.preventDefault();
+                  chooseState(filteredStates[0]!.id);
+                } else if (e.key === "Escape") {
+                  setStateSearchOpen(false);
+                  setStateQuery("");
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder={activeState?.name ?? "Search states"}
+              aria-label="Search by state"
+              aria-expanded={stateSearchOpen}
+              className="min-w-0 flex-1 bg-transparent text-[11px] text-ink-100 placeholder:text-ink-300 focus:outline-none"
+            />
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                showAllStates || activeState?.enabled ? "bg-emerald-400" : "bg-amber-400"
+              }`}
+              title={activeState?.enabled ? "State data available" : "State data coming soon"}
+            />
+          </div>
+
+          {stateSearchOpen && (
+            <div className="absolute left-3 top-[38px] w-[210px] max-h-72 overflow-y-auto rounded-md border border-base-700 bg-base-900 shadow-2xl">
+              {filteredStates.length > 0 ? (
+                filteredStates.map((state) => (
+                  <button
+                    key={state.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => chooseState(state.id)}
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[11px] transition-colors hover:bg-base-800 ${
+                      state.id === activeStateId ? "bg-base-800 text-ink-100" : "text-ink-300"
+                    }`}
+                  >
+                    <span className="truncate">{state.name}</span>
+                    <span
+                      className={`shrink-0 text-[9px] ${
+                        state.enabled ? "text-emerald-400" : "text-ink-600"
+                      }`}
+                    >
+                      {state.enabled ? "Live" : "Coming soon"}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-3 text-[11px] text-ink-500">
+                  No states match “{stateQuery}”
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

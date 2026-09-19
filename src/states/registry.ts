@@ -22,6 +22,13 @@ import { MAINE } from "./maine";
 import { NEW_HAMPSHIRE } from "./newhampshire";
 import { VERMONT } from "./vermont";
 import { MASSACHUSETTS } from "./massachusetts";
+import { OREGON } from "./oregon";
+import { CALIFORNIA } from "./california";
+import { ALASKA } from "./alaska";
+import { HAWAII } from "./hawaii";
+import { IDAHO } from "./idaho";
+import { MONTANA } from "./montana";
+import { WYOMING } from "./wyoming";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -62,6 +69,13 @@ const LIVE_STATES: StateDefinition[] = [
   NEW_HAMPSHIRE,
   VERMONT,
   MASSACHUSETTS,
+  OREGON,
+  CALIFORNIA,
+  ALASKA,
+  HAWAII,
+  IDAHO,
+  MONTANA,
+  WYOMING,
 ];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(

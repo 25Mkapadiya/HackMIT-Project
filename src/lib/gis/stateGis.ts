@@ -48,6 +48,21 @@ import { VT_SOURCES } from "@/states/vermont/sources";
 import { MA_LAYER_FETCHERS } from "@/states/massachusetts/layerFetchers";
 import { MA_SOURCES } from "@/states/massachusetts/sources";
 
+import { OR_LAYER_FETCHERS } from "@/states/oregon/layerFetchers";
+import { OR_SOURCES } from "@/states/oregon/sources";
+import { CA_LAYER_FETCHERS } from "@/states/california/layerFetchers";
+import { CA_SOURCES } from "@/states/california/sources";
+import { AK_LAYER_FETCHERS } from "@/states/alaska/layerFetchers";
+import { AK_SOURCES } from "@/states/alaska/sources";
+import { HI_LAYER_FETCHERS } from "@/states/hawaii/layerFetchers";
+import { HI_SOURCES } from "@/states/hawaii/sources";
+import { ID_LAYER_FETCHERS } from "@/states/idaho/layerFetchers";
+import { ID_SOURCES } from "@/states/idaho/sources";
+import { MT_LAYER_FETCHERS } from "@/states/montana/layerFetchers";
+import { MT_SOURCES } from "@/states/montana/sources";
+import { WY_LAYER_FETCHERS } from "@/states/wyoming/layerFetchers";
+import { WY_SOURCES } from "@/states/wyoming/sources";
+
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
 /**
@@ -564,6 +579,153 @@ const MASSACHUSETTS_BUNDLE = buildStandardBundle({
   },
 });
 
+const OREGON_BUNDLE = {
+  ...buildStandardBundle({
+    fetchers: OR_LAYER_FETCHERS,
+    hifldTransmission: OR_SOURCES.hifldTransmission,
+    hifldUtilityTerritories: OR_SOURCES.hifldUtilityTerritories,
+    usDroughtMonitor: OR_SOURCES.usDroughtMonitor,
+    interconnectionAuthorityLabel: "BPA and the serving utility (PGE, Pacific Power, Idaho Power, or a consumer-owned utility)",
+    environmentalReviewNote:
+      "Oregon has no statewide zoning layer - county/municipal land-use review and utility large-load coordination are the primary gating processes. Oregon's 2026 moratorium on new data-center eligibility for portions of the Enterprise Zone property-tax incentive (effective 2026-06-05) and the state Data Center Advisory Committee make current policy status important to verify. Oregon has no general statewide sales tax.",
+    permittingNote: {
+      text: "Large facilities in Oregon typically require county or municipal land-use/site-plan review (Oregon has no statewide zoning layer) and large-load service coordination with the serving utility and, for the federal system, Bonneville Power Administration (BPA). Potential incentives (e.g. the Strategic Investment Program) may be available but eligibility must be verified; new data-center eligibility for portions of the Enterprise Zone program is affected by a moratorium effective 2026-06-05. Utility interconnection is a separate process from land-use permitting.",
+      source: {
+        id: "or-permitting-general",
+        name: "Oregon data-center siting - general regulatory context",
+        url: "https://www.oregon.gov/energy",
+        methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+      },
+    },
+  }),
+  utilityTerritorySource: OR_SOURCES.odoeUtilityAreas,
+  utilityTerritoryCaveats: [
+    "Boundary is the Oregon Department of Energy's statewide electric service-area layer - informational, may overlap between utilities, and is not an official service-territory determination.",
+  ],
+};
+
+const CALIFORNIA_BUNDLE = {
+  ...buildStandardBundle({
+    fetchers: CA_LAYER_FETCHERS,
+    hifldTransmission: CA_SOURCES.hifldTransmission,
+    hifldUtilityTerritories: CA_SOURCES.hifldUtilityTerritories,
+    usDroughtMonitor: CA_SOURCES.usDroughtMonitor,
+    interconnectionAuthorityLabel: "CAISO and the serving utility (PG&E, SCE, SDG&E, or a municipal utility)",
+    environmentalReviewNote:
+      "California has no statewide zoning layer - city/county review plus CEQA environmental review are the primary gating processes alongside utility and CAISO large-load coordination. Groundwater sustainability (SGMA), wildfire, and seismic exposure are significant siting considerations.",
+    permittingNote: {
+      text: "Large facilities in California typically require city or county land-use approval and California Environmental Quality Act (CEQA) review, plus large-load service coordination with the serving utility and, where applicable, the California ISO (CAISO). No enacted statewide data-center-specific tax incentive was identified in the supplied research (SB 58 was proposed but not enacted as a statewide program). Utility interconnection is a separate process from land-use permitting.",
+      source: {
+        id: "ca-permitting-general",
+        name: "California data-center siting - general regulatory context",
+        url: "https://business.ca.gov",
+        methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+      },
+    },
+  }),
+  utilityTerritorySource: CA_SOURCES.cecUtilityAreas,
+  utilityTerritoryCaveats: [
+    "Boundary is the California Energy Commission's IOU/POU service-area layer - per the CEC, boundaries are approximate and not an official service determination. Community choice aggregators (which procure power but do not own the wires) are not represented.",
+  ],
+};
+
+const ALASKA_BUNDLE = {
+  ...buildStandardBundle({
+    fetchers: AK_LAYER_FETCHERS,
+    hifldTransmission: AK_SOURCES.hifldTransmission,
+    hifldUtilityTerritories: AK_SOURCES.hifldUtilityTerritories,
+    usDroughtMonitor: AK_SOURCES.usDroughtMonitor,
+    interconnectionAuthorityLabel: "the serving utility (e.g. Chugach Electric, Golden Valley Electric, MEA, HEA, or AEL&P)",
+    environmentalReviewNote:
+      "Alaska has no statewide zoning layer and no organized RTO/ISO market - borough/municipal review and direct utility engagement are the primary gating processes. Alaska has no statewide sales tax, though local sales taxes may apply. Permafrost, seismic activity, and remote logistics are major siting considerations.",
+    permittingNote: {
+      text: "Large facilities in Alaska typically require borough or municipal land-use review and direct large-load coordination with the serving utility - Alaska is not part of any organized Lower-48 market and its grids are regional (chiefly the Railbelt). Potential economic-development incentives may exist but eligibility must be verified. Utility interconnection is a separate process from land-use permitting.",
+      source: {
+        id: "ak-permitting-general",
+        name: "Alaska data-center siting - general regulatory context",
+        url: "https://www.commerce.alaska.gov",
+        methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+      },
+    },
+  }),
+};
+
+const HAWAII_BUNDLE = buildStandardBundle({
+  fetchers: HI_LAYER_FETCHERS,
+  hifldTransmission: HI_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: HI_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: HI_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving island utility (HECO, HELCO, MECO, or KIUC)",
+  environmentalReviewNote:
+    "Hawaii has no statewide zoning layer - county review is required, and each island operates a separate grid. Water use is permitted through the Commission on Water Resource Management (CWRM). Hurricane, tsunami, coastal flooding and salt-air corrosion are major siting considerations. Hawaii uses a General Excise Tax rather than a sales tax; no active statewide data-center-specific incentive was identified.",
+  permittingNote: {
+    text: "Large facilities in Hawaii typically require county land-use/zoning review and large-load coordination directly with the island's electric utility (HECO, HELCO, MECO or KIUC) - island grids are isolated and not interconnected. No active statewide data-center-specific tax incentive was identified. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "hi-permitting-general",
+      name: "Hawaii data-center siting - general regulatory context",
+      url: "https://puc.hawaii.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const IDAHO_BUNDLE = buildStandardBundle({
+  fetchers: ID_LAYER_FETCHERS,
+  hifldTransmission: ID_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: ID_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: ID_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Idaho Power, Avista, or Rocky Mountain Power)",
+  environmentalReviewNote:
+    "Idaho has no statewide zoning layer - county/municipal review and large-load coordination with the serving utility are the primary gating processes. Water rights are administered by the Idaho Department of Water Resources under prior appropriation. Wildfire and drought are high-relevance hazards.",
+  permittingNote: {
+    text: "Large facilities in Idaho typically require county or municipal site-plan/zoning review (no statewide zoning layer) and large-load service coordination with the serving utility (Idaho Power, Avista, Rocky Mountain Power, or a cooperative). Incentive eligibility must be verified project by project. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "id-permitting-general",
+      name: "Idaho data-center siting - general regulatory context",
+      url: "https://commerce.idaho.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const MONTANA_BUNDLE = buildStandardBundle({
+  fetchers: MT_LAYER_FETCHERS,
+  hifldTransmission: MT_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MT_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MT_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (NorthWestern Energy, Montana-Dakota Utilities, or a cooperative)",
+  environmentalReviewNote:
+    "Montana has no statewide zoning layer - county/municipal review and large-load coordination with the serving utility are the primary gating processes. Missoula County adopted interim zoning restrictions on new or expanded data centers outside city limits (reported through July 2027) - verify current local status. Montana has no general statewide sales tax and offers Class 17 property-tax treatment for qualified data-center property.",
+  permittingNote: {
+    text: "Large facilities in Montana typically require county or municipal zoning/site-plan review and large-load coordination with the serving utility (NorthWestern Energy, Montana-Dakota Utilities, or a cooperative). Montana has no general sales tax and offers Class 17 property-tax treatment for qualified data-center property (eligibility must be verified); Missoula County has interim data-center zoning restrictions. Water use requires a recorded right through DNRC. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "mt-permitting-general",
+      name: "Montana data-center siting - general regulatory context",
+      url: "https://commerce.mt.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const WYOMING_BUNDLE = buildStandardBundle({
+  fetchers: WY_LAYER_FETCHERS,
+  hifldTransmission: WY_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: WY_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: WY_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Rocky Mountain Power, Black Hills Energy, or a cooperative)",
+  environmentalReviewNote:
+    "Wyoming has no statewide zoning layer - county/municipal review and large-load coordination with the serving utility are the primary gating processes. Water rights are administered by the State Engineer's Office under prior appropriation. Wyoming offers a certified data-center sales/use-tax exemption program (investment thresholds apply) and has no corporate income tax.",
+  permittingNote: {
+    text: "Large facilities in Wyoming typically require county or municipal site-plan/zoning review and large-load coordination with the serving utility (Rocky Mountain Power, Black Hills Energy, or a cooperative). Wyoming offers a data-center sales/use-tax exemption certified through the Wyoming Business Council (statutory investment thresholds apply; eligibility must be verified). Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "wy-permitting-general",
+      name: "Wyoming data-center siting - general regulatory context",
+      url: "https://wyomingbusiness.org",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -588,6 +750,13 @@ const BUNDLES: Record<string, StateGisBundle> = {
   newhampshire: NEW_HAMPSHIRE_BUNDLE,
   vermont: VERMONT_BUNDLE,
   massachusetts: MASSACHUSETTS_BUNDLE,
+  oregon: OREGON_BUNDLE,
+  california: CALIFORNIA_BUNDLE,
+  alaska: ALASKA_BUNDLE,
+  hawaii: HAWAII_BUNDLE,
+  idaho: IDAHO_BUNDLE,
+  montana: MONTANA_BUNDLE,
+  wyoming: WYOMING_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {

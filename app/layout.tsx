@@ -15,7 +15,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Grid & Ground — Data Center Siting Intelligence",
+  title: "GEO: Geographical Energy Outcomes",
   description:
     "Interactive infrastructure siting and impact analysis for hypothetical data center facilities, starting with Washington State.",
 };
