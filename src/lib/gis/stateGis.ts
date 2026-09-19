@@ -27,6 +27,8 @@ import { NC_LAYER_FETCHERS } from "@/states/northcarolina/layerFetchers";
 import { NC_SOURCES } from "@/states/northcarolina/sources";
 import { VA_LAYER_FETCHERS } from "@/states/virginia/layerFetchers";
 import { VA_SOURCES } from "@/states/virginia/sources";
+import { MO_LAYER_FETCHERS } from "@/states/missouri/layerFetchers";
+import { MO_SOURCES } from "@/states/missouri/sources";
 
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
@@ -349,6 +351,25 @@ const VIRGINIA_BUNDLE = buildStandardBundle({
   },
 });
 
+const MISSOURI_BUNDLE = buildStandardBundle({
+  fetchers: MO_LAYER_FETCHERS,
+  hifldTransmission: MO_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: MO_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: MO_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "MISO/SPP",
+  environmentalReviewNote:
+    "Missouri has no statewide zoning database, so county/municipal land-use review remains site-specific. Flood exposure along the Missouri and Mississippi river corridors and New Madrid seismic risk in southeast Missouri should be screened alongside Missouri DNR environmental constraints.",
+  permittingNote: {
+    text: "Large facilities in Missouri typically require county or municipal site-plan/zoning review plus large-load coordination with the serving utility. Missouri spans both MISO and SPP footprints, so the applicable grid-planning process depends on the site and utility. The Missouri Data Center Sales Tax Exemption is a potential incentive only; project eligibility must be verified separately.",
+    source: {
+      id: "mo-permitting-general",
+      name: "Missouri data-center siting — general regulatory context",
+      url: "https://ded.mo.gov/",
+      methodology: "General state/local regulatory context; not a jurisdiction-specific legal determination or utility capacity finding.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -363,6 +384,7 @@ const BUNDLES: Record<string, StateGisBundle> = {
   southcarolina: SOUTH_CAROLINA_BUNDLE,
   northcarolina: NORTH_CAROLINA_BUNDLE,
   virginia: VIRGINIA_BUNDLE,
+  missouri: MISSOURI_BUNDLE,
 };
 
 export function getStateGisBundle(stateId: string): StateGisBundle {
