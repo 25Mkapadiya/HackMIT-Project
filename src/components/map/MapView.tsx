@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import { booleanPointInPolygon, point } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { WASHINGTON } from "@/states/washington";
 import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry";
@@ -44,6 +45,7 @@ export default function MapView() {
   // string, so they only need registering once, ever, per layer id.
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const usBoundaryRef = useRef<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
   const focusedScenarioIdRef = useRef<string | null>(null);
   const focusAnimatingRef = useRef(false);
@@ -211,6 +213,28 @@ export default function MapView() {
     }
   }, [scenarios, activeScenarioId, activeStateId, showAllStates, mapReady]);
 
+  // ---- load authoritative U.S. state boundaries used to validate proposed sites ----
+  useEffect(() => {
+    if (!mapReady) return;
+    let cancelled = false;
+
+    fetch("/api/us-boundary")
+      .then((res) => {
+        if (!res.ok) throw new Error(`U.S. boundary request failed (${res.status})`);
+        return res.json() as Promise<FeatureCollection<Polygon | MultiPolygon>>;
+      })
+      .then((data) => {
+        if (!cancelled) usBoundaryRef.current = data;
+      })
+      .catch((err) => {
+        console.error("Failed to load U.S. placement boundary", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady]);
+
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -220,13 +244,56 @@ export default function MapView() {
 
     if (!proposeMode) return;
     const handleClick = (e: maplibregl.MapMouseEvent) => {
-      addScenario(e.lngLat.lng, e.lngLat.lat);
+      const boundary = usBoundaryRef.current;
+      const clickedPoint = point([e.lngLat.lng, e.lngLat.lat]);
+      const insideUnitedStates =
+        boundary?.features.some((feature) => booleanPointInPolygon(clickedPoint, feature)) ?? false;
+
+      if (!insideUnitedStates) {
+        popupRef.current?.remove();
+        popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
+          .setLngLat(e.lngLat)
+          .setHTML(
+            boundary
+              ? "<strong>U.S. locations only</strong><br/>Data centers can only be placed within a U.S. state."
+              : "<strong>Placement boundary loading</strong><br/>Please try again in a moment."
+          )
+          .addTo(map);
+        return;
+      }
+
+      let targetStateId = activeStateId;
+
+      if (showAllStates) {
+        const matchingFeature = boundary?.features.find((feature) =>
+          booleanPointInPolygon(clickedPoint, feature)
+        );
+        const postal = matchingFeature?.properties?.postal as string | undefined;
+        const targetState = postal
+          ? getEnabledStates().find((state) => state.abbreviation === postal)
+          : undefined;
+
+        if (!targetState) {
+          popupRef.current?.remove();
+          popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "300px" })
+            .setLngLat(e.lngLat)
+            .setHTML(
+              "<strong>State not implemented yet</strong><br/>Choose a location inside one of the states currently included in Show All."
+            )
+            .addTo(map);
+          return;
+        }
+
+        targetStateId = targetState.id;
+      }
+
+      addScenario(e.lngLat.lng, e.lngLat.lat, targetStateId);
     };
     map.on("click", handleClick);
     return () => {
       map.off("click", handleClick);
     };
-  }, [mapReady, proposeMode, addScenario]);
+  }, [mapReady, proposeMode, addScenario, activeStateId, showAllStates]);
 
   // ---- state / all-implemented-states camera ----
   const lastCameraTargetRef = useRef(`state:${activeStateId}`);
@@ -279,6 +346,8 @@ export default function MapView() {
     }
 
     async function syncLayers() {
+      const tasks: Array<() => Promise<void>> = [];
+
       for (const state of states) {
         const bboxParam = stateBboxParam(state.id);
         for (const layer of state.layers) {
@@ -288,41 +357,59 @@ export default function MapView() {
           const wantVisible = Boolean(layerVisibility[layer.id]);
           const sourceId = `src-${state.id}-${layer.id}`;
 
-          if (!loadedLayerIds.current.has(key)) {
-            if (!wantVisible || loadingLayerIds.current.has(key)) continue;
-            loadingLayerIds.current.add(key);
-            try {
-              const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
-              const data = (await res.json()) as FeatureCollection;
-              if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
-              if (!map.getSource(sourceId)) {
-                map.addSource(sourceId, { type: "geojson", data });
-                const specs = buildLayerSpecs(layer, sourceId, state.id);
-                for (const spec of specs) {
-                  if (!map.getLayer(spec.id)) map.addLayer(spec);
-                }
-                const interactionKey = `${state.id}:${layer.id}`;
-                if (!interactivityAttached.current.has(interactionKey)) {
-                  attachInteractivity(map, layer, popupRef, state.id);
-                  interactivityAttached.current.add(interactionKey);
-                }
-              }
-              loadedLayerIds.current.add(key);
-            } catch (err) {
-              console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
-            } finally {
-              loadingLayerIds.current.delete(key);
-            }
-          } else {
+          if (loadedLayerIds.current.has(key)) {
             const specs = buildLayerSpecs(layer, sourceId, state.id);
             for (const spec of specs) {
               if (map.getLayer(spec.id)) {
                 map.setLayoutProperty(spec.id, "visibility", wantVisible ? "visible" : "none");
               }
             }
+            continue;
           }
+
+          if (!wantVisible || loadingLayerIds.current.has(key)) continue;
+
+          tasks.push(async () => {
+            loadingLayerIds.current.add(key);
+            try {
+              const res = await fetch(`${layer.endpoint}?bbox=${bboxParam}&state=${state.id}`);
+              const data = (await res.json()) as FeatureCollection;
+              if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
+
+              if (!map.getSource(sourceId)) {
+                map.addSource(sourceId, { type: "geojson", data });
+                const specs = buildLayerSpecs(layer, sourceId, state.id);
+                for (const spec of specs) {
+                  if (!map.getLayer(spec.id)) map.addLayer(spec);
+                }
+
+                const interactionKey = `${state.id}:${layer.id}`;
+                if (!interactivityAttached.current.has(interactionKey)) {
+                  attachInteractivity(map, layer, popupRef, state.id);
+                  interactivityAttached.current.add(interactionKey);
+                }
+              }
+
+              loadedLayerIds.current.add(key);
+            } catch (err) {
+              console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
+            } finally {
+              loadingLayerIds.current.delete(key);
+            }
+          });
         }
       }
+
+      // Avoid a state-by-state waterfall while still limiting pressure on public GIS APIs.
+      const workerCount = Math.min(showAllStates ? 6 : 4, tasks.length);
+      let nextTask = 0;
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (nextTask < tasks.length) {
+          const task = tasks[nextTask++];
+          if (task) await task();
+        }
+      });
+      await Promise.all(workers);
     }
 
     syncLayers();

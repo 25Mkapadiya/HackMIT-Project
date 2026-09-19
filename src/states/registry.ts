@@ -12,6 +12,12 @@ import { GEORGIA } from "./georgia";
 import { SOUTH_CAROLINA } from "./southcarolina";
 import { NORTH_CAROLINA } from "./northcarolina";
 import { VIRGINIA } from "./virginia";
+import { WEST_VIRGINIA } from "./westvirginia";
+import { MARYLAND } from "./maryland";
+import { TEXAS } from "./texas";
+import { DELAWARE } from "./delaware";
+import { ILLINOIS } from "./illinois";
+import { MISSOURI } from "./missouri";
 import { OREGON } from "./oregon";
 import { CALIFORNIA } from "./california";
 import { ALASKA } from "./alaska";
@@ -49,6 +55,12 @@ const LIVE_STATES: StateDefinition[] = [
   SOUTH_CAROLINA,
   NORTH_CAROLINA,
   VIRGINIA,
+  WEST_VIRGINIA,
+  MARYLAND,
+  TEXAS,
+  DELAWARE,
+  MISSOURI,
+  ILLINOIS,
   OREGON,
   CALIFORNIA,
   ALASKA,
