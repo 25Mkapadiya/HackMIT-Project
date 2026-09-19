@@ -49,7 +49,6 @@ export default function MapView() {
   const loadingLayerIds = useRef<Set<string>>(new Set());
   const preloadedLayerDataRef = useRef<Map<string, FeatureCollection>>(new Map());
   const preloadPromiseRef = useRef<Promise<void> | null>(null);
-  const preloadMountedRef = useRef(false);
   const showAllAnimationRunRef = useRef(0);
   const lastShowAllAnimationKeyRef = useRef("");
   // Layer ids (e.g. "transmission-lines") are stable across states even though
@@ -241,60 +240,6 @@ export default function MapView() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ---- mount all prefetched Show All layers hidden (once) ----
-  // Prefetching only the GeoJSON still left MapLibre work for the button click.
-  // Once the map and preload are ready, build every source/layer ahead of time
-  // and keep it hidden. Show All can then animate visibility only.
-  useEffect(() => {
-    if (!mapReady || !mapRef.current || preloadMountedRef.current) return;
-    let cancelled = false;
-    const map = mapRef.current;
-
-    const mountPreloadedLayers = async () => {
-      await preloadPromiseRef.current;
-      if (cancelled || !mapRef.current || preloadMountedRef.current) return;
-
-      for (const state of getShowAllStates()) {
-        for (const layer of state.layers) {
-          if (layer.geometryType === "raster") continue;
-
-          const key = `${state.id}:${layer.id}`;
-          const data = preloadedLayerDataRef.current.get(key);
-          if (!data) continue;
-
-          const sourceId = `src-${state.id}-${layer.id}`;
-          if (!map.getSource(sourceId)) {
-            map.addSource(sourceId, { type: "geojson", data });
-          }
-
-          const specs = buildLayerSpecs(layer, sourceId, state.id);
-          for (const spec of specs) {
-            if (!map.getLayer(spec.id)) {
-              map.addLayer(spec);
-            }
-            map.setLayoutProperty(spec.id, "visibility", "none");
-          }
-
-          const interactionKey = `${state.id}:${layer.id}`;
-          if (!interactivityAttached.current.has(interactionKey)) {
-            attachInteractivity(map, layer, popupRef, state.id);
-            interactivityAttached.current.add(interactionKey);
-          }
-
-          loadedLayerIds.current.add(key);
-        }
-      }
-
-      preloadMountedRef.current = true;
-    };
-
-    void mountPreloadedLayers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mapReady]);
 
   // ---- Hawaii inset ----
   // Keep Hawaii geographically visible without forcing the primary camera to span
@@ -525,39 +470,44 @@ export default function MapView() {
     async function syncLayers() {
       const tasks: Array<Promise<void>> = [];
 
-      // In Show All mode, wait for the background preload/mount pipeline rather
-      // than starting a second set of fetches from the click handler.
+      // In Show All mode, wait for the background data preload. We deliberately
+      // do NOT pre-mount hidden MapLibre layers in a separate effect because that
+      // can race with normal state visibility and leave everything stuck hidden.
       if (showAllStates && preloadPromiseRef.current) {
         await preloadPromiseRef.current;
 
-        // The preload may have finished before this effect got a chance to mount
-        // every source. Mount any remaining cached sources synchronously now.
         for (const state of states) {
           for (const layer of state.layers) {
             if (layer.geometryType === "raster") continue;
             const key = `${state.id}:${layer.id}`;
             if (loadedLayerIds.current.has(key)) continue;
 
-            const data = preloadedLayerDataRef.current.get(key);
-            if (!data) continue;
-            const sourceId = `src-${state.id}-${layer.id}`;
+            const cachedData = preloadedLayerDataRef.current.get(key);
+            if (cachedData) {
+              const sourceId = `src-${state.id}-${layer.id}`;
+              if (!map.getSource(sourceId)) {
+                map.addSource(sourceId, { type: "geojson", data: cachedData });
+              }
+              for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+                if (!map.getLayer(spec.id)) map.addLayer(spec);
+                map.setLayoutProperty(spec.id, "visibility", "none");
+              }
 
-            if (!map.getSource(sourceId)) {
-              map.addSource(sourceId, { type: "geojson", data });
+              const interactionKey = `${state.id}:${layer.id}`;
+              if (!interactivityAttached.current.has(interactionKey)) {
+                attachInteractivity(map, layer, popupRef, state.id);
+                interactivityAttached.current.add(interactionKey);
+              }
+              loadedLayerIds.current.add(key);
+            } else if (Boolean(layerVisibility[layer.id])) {
+              // A preload request can fail independently. Retry only missing
+              // visible layers here so one bad endpoint cannot blank Show All.
+              tasks.push(ensureLayer(state, layer));
             }
-            for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
-              if (!map.getLayer(spec.id)) map.addLayer(spec);
-              map.setLayoutProperty(spec.id, "visibility", "none");
-            }
-
-            const interactionKey = `${state.id}:${layer.id}`;
-            if (!interactivityAttached.current.has(interactionKey)) {
-              attachInteractivity(map, layer, popupRef, state.id);
-              interactivityAttached.current.add(interactionKey);
-            }
-            loadedLayerIds.current.add(key);
           }
         }
+
+        await Promise.all(tasks);
       } else {
         for (const state of states) {
           for (const layer of state.layers) {
@@ -618,8 +568,7 @@ export default function MapView() {
         window.setTimeout(() => {
           if (
             showAllAnimationRunRef.current !== runId ||
-            lastSyncedViewKey.current !== viewKey ||
-            !showAllStatesRef.current
+            lastSyncedViewKey.current !== viewKey
           ) {
             return;
           }
