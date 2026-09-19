@@ -30,6 +30,8 @@ export default function MapView() {
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
+  const activeStateIdRef = useRef(activeStateId);
+  const focusedScenarioIdRef = useRef<string | null>(null);
   const focusAnimatingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -73,9 +75,21 @@ export default function MapView() {
       event.stopPropagation();
       event.stopImmediatePropagation();
       focusAnimatingRef.current = true;
-      spiralFocusOnSite(map, target, () => {
-        focusAnimatingRef.current = false;
-      });
+
+      if (focusedScenarioIdRef.current === target.id) {
+        const state = getState(activeStateIdRef.current) ?? getState(DEFAULT_STATE_ID)!;
+        spiralZoomOutToState(map, state.bounds, () => {
+          focusedScenarioIdRef.current = null;
+          focusAnimatingRef.current = false;
+          syncCompassLabel(map, target, false);
+        });
+      } else {
+        spiralFocusOnSite(map, target, () => {
+          focusedScenarioIdRef.current = target.id;
+          focusAnimatingRef.current = false;
+          syncCompassLabel(map, target, true);
+        });
+      }
     };
     compassButton?.addEventListener("click", handleCompassFocus, true);
 
@@ -151,6 +165,7 @@ export default function MapView() {
 
   // ---- keep the compass target + accessible label in sync with the active site ----
   useEffect(() => {
+    activeStateIdRef.current = activeStateId;
     const active = scenarios.find((scenario) => scenario.id === activeScenarioId) ?? null;
     activeScenarioRef.current = active
       ? { id: active.id, label: active.label, lng: active.lng, lat: active.lat }
@@ -163,15 +178,16 @@ export default function MapView() {
     if (!compassButton) return;
 
     if (active) {
-      compassButton.title = `Focus on ${active.label}`;
-      compassButton.setAttribute("aria-label", `Focus on ${active.label}`);
-      compassButton.dataset.focusSite = "true";
+      if (focusedScenarioIdRef.current !== active.id) {
+        focusedScenarioIdRef.current = null;
+      }
+      syncCompassLabel(mapRef.current, active, focusedScenarioIdRef.current === active.id);
     } else {
       compassButton.title = "Reset bearing to north";
       compassButton.setAttribute("aria-label", "Reset bearing to north");
       delete compassButton.dataset.focusSite;
     }
-  }, [scenarios, activeScenarioId, mapReady]);
+  }, [scenarios, activeScenarioId, activeStateId, mapReady]);
 
   // ---- propose-mode cursor + click handling ----
   useEffect(() => {
@@ -440,6 +456,22 @@ export default function MapView() {
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }
 
+function syncCompassLabel(
+  map: maplibregl.Map,
+  site: { label: string },
+  focused: boolean
+) {
+  const compassButton = map
+    .getContainer()
+    .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
+  if (!compassButton) return;
+
+  const label = focused ? `Return to state view from ${site.label}` : `Focus on ${site.label}`;
+  compassButton.title = label;
+  compassButton.setAttribute("aria-label", label);
+  compassButton.dataset.focusSite = focused ? "zoomed-in" : "ready";
+}
+
 function spiralFocusOnSite(
   map: maplibregl.Map,
   site: { lng: number; lat: number },
@@ -496,6 +528,59 @@ function spiralFocusOnSite(
     essential: true,
   });
   map.once("moveend", secondPhase);
+}
+
+
+function spiralZoomOutToState(
+  map: maplibregl.Map,
+  bounds: [[number, number], [number, number]],
+  onDone: () => void
+) {
+  const interactionHandlers = [
+    map.dragPan,
+    map.scrollZoom,
+    map.boxZoom,
+    map.dragRotate,
+    map.keyboard,
+    map.doubleClickZoom,
+    map.touchZoomRotate,
+  ];
+  const previouslyEnabled = interactionHandlers.map((handler) => handler.isEnabled());
+
+  for (const handler of interactionHandlers) handler.disable();
+  map.stop();
+
+  const restoreInteraction = () => {
+    interactionHandlers.forEach((handler, index) => {
+      if (previouslyEnabled[index]) handler.enable();
+    });
+    onDone();
+  };
+
+  const centerLng = (bounds[0][0] + bounds[1][0]) / 2;
+  const centerLat = (bounds[0][1] + bounds[1][1]) / 2;
+
+  map.easeTo({
+    center: [centerLng, centerLat],
+    zoom: Math.max(map.getMinZoom(), 8.5),
+    bearing: map.getBearing() + 150,
+    pitch: 24,
+    duration: 800,
+    easing: (t) => t * t * (3 - 2 * t),
+    essential: true,
+  });
+
+  map.once("moveend", () => {
+    map.fitBounds(bounds, {
+      padding: 60,
+      bearing: 0,
+      pitch: 0,
+      duration: 1050,
+      easing: (t) => 1 - Math.pow(1 - t, 3),
+      essential: true,
+    });
+    map.once("moveend", restoreInteraction);
+  });
 }
 
 // A fixed minZoom that "roughly" fits US_MAX_BOUNDS only works for one window width — on a
