@@ -22,6 +22,7 @@ const USDM_LABELS = [
 export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<WaterAnalysis> {
   const { lng, lat, mwLoad, coolingTechnology, stateId } = scenario;
   const bundle = getStateGisBundle(stateId);
+  const hasWaterRightsLayer = Boolean(bundle.fetchers["water-diversions"]);
 
   const waterBbox = bboxAroundMiles(lng, lat, 15);
   const rightsBbox = bboxAroundMiles(lng, lat, 10);
@@ -110,10 +111,14 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
     },
     nearbyWaterRightsCount: {
       label: "Water right diversions within 10 mi",
-      value: rightsNearby.length,
-      confidence: "fact",
+      value: hasWaterRightsLayer ? rightsNearby.length : null,
+      confidence: hasWaterRightsLayer ? "fact" : "unknown",
       source: bundle.waterRightsSource,
-      caveats: ["Count of mapped diversion/well points, not a measure of remaining unallocated water."],
+      caveats: hasWaterRightsLayer
+        ? ["Count of mapped diversion/well points, not a measure of remaining unallocated water."]
+        : [
+            "No verified point-level water-right/withdrawal-permit GIS layer is integrated for this state. A missing layer must not be interpreted as zero nearby users or unrestricted water availability.",
+          ],
     },
     droughtStatus: {
       label: "Drought status",
