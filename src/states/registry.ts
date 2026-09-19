@@ -29,6 +29,9 @@ import { HAWAII } from "./hawaii";
 import { IDAHO } from "./idaho";
 import { MONTANA } from "./montana";
 import { WYOMING } from "./wyoming";
+import { NEVADA } from "./nevada";
+import { UTAH } from "./utah";
+import { COLORADO } from "./colorado";
 import { US_STATES_DIRECTORY } from "./directory";
 
 /**
@@ -76,6 +79,9 @@ const LIVE_STATES: StateDefinition[] = [
   IDAHO,
   MONTANA,
   WYOMING,
+  NEVADA,
+  UTAH,
+  COLORADO,
 ];
 const LIVE_ABBREVIATIONS = new Set(LIVE_STATES.map((s) => s.abbreviation));
 const STUB_STATES: StateDefinition[] = US_STATES_DIRECTORY.filter((s) => !LIVE_ABBREVIATIONS.has(s.abbreviation)).map(

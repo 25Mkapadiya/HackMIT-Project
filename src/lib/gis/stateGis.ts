@@ -63,6 +63,13 @@ import { MT_SOURCES } from "@/states/montana/sources";
 import { WY_LAYER_FETCHERS } from "@/states/wyoming/layerFetchers";
 import { WY_SOURCES } from "@/states/wyoming/sources";
 
+import { NV_LAYER_FETCHERS } from "@/states/nevada/layerFetchers";
+import { NV_SOURCES } from "@/states/nevada/sources";
+import { UT_LAYER_FETCHERS } from "@/states/utah/layerFetchers";
+import { UT_SOURCES } from "@/states/utah/sources";
+import { CO_LAYER_FETCHERS } from "@/states/colorado/layerFetchers";
+import { CO_SOURCES } from "@/states/colorado/sources";
+
 export type Fetcher = (bbox: Bbox) => Promise<FeatureCollection>;
 
 /**
@@ -726,6 +733,63 @@ const WYOMING_BUNDLE = buildStandardBundle({
   },
 });
 
+const NEVADA_BUNDLE = buildStandardBundle({
+  fetchers: NV_LAYER_FETCHERS,
+  hifldTransmission: NV_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: NV_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: NV_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (NV Energy or a cooperative/municipal utility)",
+  environmentalReviewNote:
+    "Nevada has no statewide zoning layer - county/municipal review and large-load coordination with the serving utility are the primary gating processes. Water rights are administered by the State Engineer under prior appropriation, and groundwater basin restrictions are a major siting constraint.",
+  permittingNote: {
+    text: "Large facilities in Nevada typically require county or municipal zoning/site-plan review (no statewide zoning layer) and large-load coordination with the serving utility (NV Energy or a cooperative). Nevada offers economic-development abatements whose eligibility must be verified project by project. Water use requires a State Engineer water right; groundwater basin restrictions apply. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "nv-permitting-general",
+      name: "Nevada data-center siting - general regulatory context",
+      url: "https://goed.nv.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const UTAH_BUNDLE = buildStandardBundle({
+  fetchers: UT_LAYER_FETCHERS,
+  hifldTransmission: UT_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: UT_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: UT_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Rocky Mountain Power or a municipal/cooperative utility)",
+  environmentalReviewNote:
+    "Utah has no statewide zoning layer - municipal/county review and large-load coordination with the serving utility are the primary gating processes. Utah requires large data centers to report projected water needs before construction and annual withdrawals afterward, and 2026's H.B. 507 changes how local incentives may be given to certain large-load data centers (beginning 2027). Wasatch Fault seismic risk applies along the Wasatch Front.",
+  permittingNote: {
+    text: "Large facilities in Utah typically require municipal or county zoning/site-plan review (no statewide zoning layer) and large-load coordination with the serving utility (Rocky Mountain Power or a municipal/cooperative). Utah offers a sales/use-tax exemption for qualifying data-center equipment (newly built on or after 2016-07-01, at least 150,000 sq ft; eligibility must be verified) and requires water-use reporting for large data centers. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "ut-permitting-general",
+      name: "Utah data-center siting - general regulatory context",
+      url: "https://business.utah.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
+const COLORADO_BUNDLE = buildStandardBundle({
+  fetchers: CO_LAYER_FETCHERS,
+  hifldTransmission: CO_SOURCES.hifldTransmission,
+  hifldUtilityTerritories: CO_SOURCES.hifldUtilityTerritories,
+  usDroughtMonitor: CO_SOURCES.usDroughtMonitor,
+  interconnectionAuthorityLabel: "the serving utility (Xcel Energy, Black Hills Energy, or a municipal/cooperative utility)",
+  environmentalReviewNote:
+    "Colorado has no statewide zoning layer - county/municipal review and large-load coordination with the serving utility are the primary gating processes. Water availability is a key long-term constraint (prior appropriation, adjudicated in water courts). A major statewide data-center incentive proposal failed in the 2026 session, and large-load policy remains actively debated.",
+  permittingNote: {
+    text: "Large facilities in Colorado typically require county or municipal zoning/site-plan review (no statewide zoning layer) and large-load coordination with the serving utility (Xcel Energy, Black Hills, or a cooperative). No enacted statewide data-center incentive was identified (a 2026 proposal failed) and state large-load policy is evolving. Water use requires a right adjudicated through Colorado's water courts. Utility interconnection is a separate process from land-use permitting.",
+    source: {
+      id: "co-permitting-general",
+      name: "Colorado data-center siting - general regulatory context",
+      url: "https://oedit.colorado.gov",
+      methodology: "General regulatory context compiled from state/local public reporting, not a jurisdiction-specific legal determination.",
+    },
+  },
+});
+
 const BUNDLES: Record<string, StateGisBundle> = {
   washington: WASHINGTON_BUNDLE,
   oklahoma: OKLAHOMA_BUNDLE,
@@ -753,6 +817,9 @@ const BUNDLES: Record<string, StateGisBundle> = {
   oregon: OREGON_BUNDLE,
   california: CALIFORNIA_BUNDLE,
   alaska: ALASKA_BUNDLE,
+  nevada: NEVADA_BUNDLE,
+  utah: UTAH_BUNDLE,
+  colorado: COLORADO_BUNDLE,
   hawaii: HAWAII_BUNDLE,
   idaho: IDAHO_BUNDLE,
   montana: MONTANA_BUNDLE,
