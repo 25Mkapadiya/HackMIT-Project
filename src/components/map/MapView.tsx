@@ -30,7 +30,6 @@ export default function MapView() {
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
-  const activeStateIdRef = useRef(activeStateId);
   const focusedScenarioIdRef = useRef<string | null>(null);
   const focusAnimatingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
@@ -42,6 +41,10 @@ export default function MapView() {
   const activeStateId = useAppStore((s) => s.activeStateId);
   const addScenario = useAppStore((s) => s.addScenario);
   const setActiveScenario = useAppStore((s) => s.setActiveScenario);
+  // Declared after activeStateId (used before its own declaration otherwise —
+  // useRef's initializer runs during render, so this must come after the hook
+  // that produces the value it seeds).
+  const activeStateIdRef = useRef(activeStateId);
 
   // ---- init map (once) ----
   useEffect(() => {
