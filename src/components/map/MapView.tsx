@@ -10,7 +10,13 @@ import { getState, getEnabledStates, DEFAULT_STATE_ID } from "@/states/registry"
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
 import type { LayerDefinition } from "@/lib/types";
-import { BASEMAP_STYLE, US_MAX_BOUNDS, US_MIN_ZOOM, emptyFeatureCollection } from "./mapStyle";
+import {
+  BASEMAP_STYLE,
+  US_MAINLAND_VIEW_BOUNDS,
+  US_MAX_BOUNDS,
+  US_MIN_ZOOM,
+  emptyFeatureCollection,
+} from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
 import { buildPopupHtml } from "./popupContent";
 
@@ -36,7 +42,9 @@ function implementedStatesBounds(): [[number, number], [number, number]] {
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hawaiiContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const hawaiiMapRef = useRef<maplibregl.Map | null>(null);
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
   // Layer ids (e.g. "transmission-lines") are stable across states even though
@@ -184,6 +192,34 @@ export default function MapView() {
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Hawaii inset ----
+  // Keep Hawaii geographically visible without forcing the primary camera to span
+  // the Pacific. The inset is intentionally non-interactive so all navigation stays
+  // with the main map.
+  useEffect(() => {
+    if (!hawaiiContainerRef.current || hawaiiMapRef.current) return;
+
+    const hawaiiMap = new maplibregl.Map({
+      container: hawaiiContainerRef.current,
+      style: BASEMAP_STYLE,
+      center: [-157.5, 20.8],
+      zoom: 4.65,
+      minZoom: 4.65,
+      maxZoom: 4.65,
+      pitch: 0,
+      bearing: 0,
+      interactive: false,
+      renderWorldCopies: false,
+      attributionControl: false,
+    });
+
+    hawaiiMapRef.current = hawaiiMap;
+    return () => {
+      hawaiiMap.remove();
+      hawaiiMapRef.current = null;
+    };
   }, []);
 
   // ---- keep the compass target + accessible label in sync with the active site ----
@@ -566,7 +602,48 @@ export default function MapView() {
   // Inline style (not a Tailwind class) is required here: maplibre-gl.css ships its own
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over
   // the `absolute` utility class and collapses this container to zero height.
-  return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
+  return (
+    <>
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+      <div
+        aria-label="Hawaii map inset"
+        style={{
+          position: "absolute",
+          left: 12,
+          bottom: 46,
+          width: "clamp(132px, 14vw, 174px)",
+          aspectRatio: "1.42 / 1",
+          overflow: "hidden",
+          border: "1px solid rgba(255,255,255,0.72)",
+          borderRadius: 8,
+          background: "#101318",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.32)",
+          zIndex: 3,
+          pointerEvents: "none",
+        }}
+      >
+        <div ref={hawaiiContainerRef} style={{ position: "absolute", inset: 0 }} />
+        <div
+          style={{
+            position: "absolute",
+            left: 8,
+            top: 7,
+            padding: "3px 6px",
+            borderRadius: 4,
+            background: "rgba(10,13,18,0.78)",
+            color: "rgba(255,255,255,0.92)",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            lineHeight: 1,
+          }}
+        >
+          Hawaii
+        </div>
+      </div>
+    </>
+  );
 }
 
 function syncCompassLabel(
@@ -696,11 +773,11 @@ function spiralZoomOutToState(
   });
 }
 
-// A fixed minZoom that "roughly" fits US_MAX_BOUNDS only works for one window width — on a
+// A fixed minZoom that "roughly" fits the mainland view bounds only works for one window width — on a
 // wider viewport (or with the sidebar taking less room) the box ends up smaller than the
 // screen, and maxBounds' pan clamp can't stop you zooming out past that, leaving the map
 // floating in blank space. Recomputing the floor from the actual container size keeps the
-// box flush with the viewport at any window size.
+// box flush with the viewport at any window size. Hawaii is shown separately in the inset.
 //
 // map.cameraForBounds()/fitBounds() intentionally compute a "contain" fit (the whole box
 // stays fully visible, so the *less* constraining axis is left with blank margin) — that's
@@ -730,7 +807,7 @@ function coverZoomForBounds(
 function fitMinZoomToBounds(map: maplibregl.Map) {
   const { width, height } = map.getContainer().getBoundingClientRect();
   if (width < 1 || height < 1) return;
-  const zoom = coverZoomForBounds(US_MAX_BOUNDS, width, height);
+  const zoom = coverZoomForBounds(US_MAINLAND_VIEW_BOUNDS, width, height);
   map.setMinZoom(Math.max(zoom, US_MIN_ZOOM));
 }
 
