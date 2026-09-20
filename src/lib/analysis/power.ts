@@ -2,10 +2,11 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { DemandPressureLabel, DistanceResult, PowerAnalysis, ScenarioConfig, SourceMeta } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
-import { getCountyDensityRecord } from "@/lib/gis/nationalFetchers";
-import { bboxAroundMiles, milesBetween, nearestFeature, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
-import { NEARBY_GENERATION_RADIUS_MI, POPULATION_DENSITY_TIERS, VOLTAGE_TIERS } from "@/lib/constants/assumptions";
+import { fetchHifldSubstations, getCountyDensityRecord } from "@/lib/gis/nationalFetchers";
+import { bboxAroundMiles, milesBetween, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
+import { NEARBY_GENERATION_RADIUS_MI, POPULATION_DENSITY_TIERS } from "@/lib/constants/assumptions";
 import { cached, TTL } from "@/lib/cache/memoryCache";
+import { queryArcGisGeoJSON, type Bbox } from "@/lib/gis/arcgis";
 
 interface TransmissionProps {
   XRefCd?: string;
@@ -25,6 +26,68 @@ interface SubstationProps {
 }
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
+
+const NEAREST_GRID_SEARCH_RADII_MI = [35, 75, 150, 300, 600, 1200, 2500] as const;
+
+async function fetchTransmissionTier(
+  bbox: Bbox,
+  minKv: number,
+  maxKv?: number
+): Promise<FeatureCollection<Geometry, TransmissionProps>> {
+  const where = maxKv != null
+    ? `voltage >= ${minKv} AND voltage < ${maxKv}`
+    : `voltage >= ${minKv}`;
+
+  const fc = await queryArcGisGeoJSON<{
+    owner?: string;
+    voltage?: number | string;
+    type?: string;
+    id?: string;
+  }>(
+    NATIONAL_SOURCES.hifldTransmission.url,
+    { bbox, where, outFields: "owner,voltage,type,id" },
+    TTL.ONE_DAY
+  );
+
+  return {
+    type: "FeatureCollection",
+    features: fc.features.map((feature) => {
+      const p = feature.properties ?? {};
+      const rawVoltage = typeof p.voltage === "number" ? p.voltage : Number(p.voltage);
+      const voltage = Number.isFinite(rawVoltage) && rawVoltage > 0 ? rawVoltage : undefined;
+      return {
+        ...feature,
+        properties: {
+          VoltageMeas: voltage,
+          OperatingLineNm: p.owner ? `${p.owner}${p.type ? ` (${p.type})` : ""}` : undefined,
+          XRefCd: p.id ?? undefined,
+        },
+      };
+    }),
+  };
+}
+
+async function nearestWithExpandingSearch<P>(
+  lng: number,
+  lat: number,
+  fetcher: (bbox: Bbox) => Promise<FeatureCollection<Geometry, P>>
+) {
+  for (let i = 0; i < NEAREST_GRID_SEARCH_RADII_MI.length; i += 1) {
+    const radius = NEAREST_GRID_SEARCH_RADII_MI[i];
+    const fc = await fetcher(bboxAroundMiles(lng, lat, radius));
+    const nearest = nearestFeature(lng, lat, fc);
+    if (!nearest.feature) continue;
+
+    const nextRadius =
+      NEAREST_GRID_SEARCH_RADII_MI[Math.min(i + 1, NEAREST_GRID_SEARCH_RADII_MI.length - 1)];
+    if (nextRadius === radius) return nearest;
+
+    const wider = await fetcher(bboxAroundMiles(lng, lat, nextRadius));
+    return nearestFeature(lng, lat, wider);
+  }
+
+  return { feature: null, distanceMiles: null };
+}
 
 interface CensusGeographyResponse {
   result: {
@@ -86,7 +149,16 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
   const territoryBbox = bboxAroundMiles(lng, lat, 20);
   const generationBbox = bboxAroundMiles(lng, lat, NEARBY_GENERATION_RADIUS_MI);
 
-  const [transmissionFc, territoryFc, generationFc, substationFc, county] = await Promise.all([
+  const [
+    transmissionFc,
+    territoryFc,
+    generationFc,
+    county,
+    nearest115Raw,
+    nearest230Raw,
+    nearest500Raw,
+    nearestSubstationResult,
+  ] = await Promise.all([
     getFetcher(stateId, "transmission-lines")(transmissionBbox) as Promise<FeatureCollection<Geometry, TransmissionProps>>,
     getFetcher(stateId, "utility-territories")(territoryBbox) as Promise<
       FeatureCollection<Geometry, { Name?: string }>
@@ -94,30 +166,25 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
     getFetcher(stateId, "power-plants")(generationBbox) as Promise<
       FeatureCollection<Geometry, { plantName?: string; fuel?: string; nameplateMw?: number }>
     >,
-    getFetcher(stateId, "electric-substations")(transmissionBbox) as Promise<FeatureCollection<Geometry, SubstationProps>>,
     getCountyGeoid(lng, lat),
+    nearestWithExpandingSearch(lng, lat, (bbox) => fetchTransmissionTier(bbox, 115, 230)),
+    nearestWithExpandingSearch(lng, lat, (bbox) => fetchTransmissionTier(bbox, 230, 500)),
+    nearestWithExpandingSearch(lng, lat, (bbox) => fetchTransmissionTier(bbox, 500)),
+    nearestWithExpandingSearch(lng, lat, (bbox) =>
+      fetchHifldSubstations(bbox) as Promise<FeatureCollection<Geometry, SubstationProps>>
+    ),
   ]);
 
   const densityRecord = getCountyDensityRecord(county?.geoid);
   const demandPressureLabel = demandPressureLabelFor(densityRecord?.densityPerSqMi ?? null);
 
   const nearestAny = toDistanceResult(nearestFeature(lng, lat, transmissionFc), bundle.transmissionSource);
-  const nearest115 = toDistanceResult(
-    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.mid),
-    bundle.transmissionSource
-  );
-  const nearest230 = toDistanceResult(
-    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.high),
-    bundle.transmissionSource
-  );
-  const nearest500 = toDistanceResult(
-    nearestFeatureWhere(lng, lat, transmissionFc, (p) => (p.VoltageMeas ?? 0) >= VOLTAGE_TIERS.extraHigh),
-    bundle.transmissionSource
-  );
+  const nearest115 = toDistanceResult(nearest115Raw, NATIONAL_SOURCES.hifldTransmission);
+  const nearest230 = toDistanceResult(nearest230Raw, NATIONAL_SOURCES.hifldTransmission);
+  const nearest500 = toDistanceResult(nearest500Raw, NATIONAL_SOURCES.hifldTransmission);
 
   const territory = polygonContaining(lng, lat, territoryFc);
 
-  const nearestSubstationResult = nearestFeature(lng, lat, substationFc);
   const substationProps = nearestSubstationResult.feature?.properties ?? null;
   const substationGeometry = nearestSubstationResult.feature?.geometry;
   const substationCoords =
