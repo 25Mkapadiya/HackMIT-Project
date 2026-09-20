@@ -3,7 +3,7 @@ import type { ScenarioConfig, WaterAnalysis } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, featuresWithinRadius, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
-import { CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION, CLOSED_LOOP_GALLONS_PER_TON, CLOSED_LOOP_REFRESH_INTERVAL_YEARS, COOLING_TECH_TO_WUE_KEY, COOLING_TOWER_CYCLES_OF_CONCENTRATION, GALLONS_PER_LITER, KW_PER_REFRIGERATION_TON, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
+import { CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION, CLOSED_LOOP_GALLONS_PER_TON, CLOSED_LOOP_REFRESH_INTERVAL_YEARS, COOLING_TOWER_CYCLES_OF_CONCENTRATION, COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC, KW_PER_REFRIGERATION_TON } from "@/lib/constants/assumptions";
 
 /** D0 (abnormally dry) through D4 (exceptional drought) — US Drought Monitor classification labels. */
 const USDM_LABELS = [
@@ -94,31 +94,37 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   const droughtFeature = polygonContaining(lng, lat, droughtFc);
   const { waterStress, droughtStatusText } = deriveWaterStress(droughtFeature, rightsNearby.length);
 
-  const wueKey = COOLING_TECH_TO_WUE_KEY[coolingTechnology] ?? "us_average";
-  const wue = WUE_L_PER_KWH[wueKey] ?? WUE_L_PER_KWH.us_average;
-
-  const isEvaporative = coolingTechnology === "cooling_tower_evaporative";
+  const isAirCooledDx = coolingTechnology === "air_cooled_dx";
   const isClosedChilledWater = coolingTechnology === "chilled_water_air_cooled_chiller";
+  const isEvaporative = coolingTechnology === "cooling_tower_evaporative";
+  const isClosedLoopLiquid = coolingTechnology === "closed_loop_liquid";
+  const isImmersion = coolingTechnology === "immersion";
 
+  // Nearly all IT electrical power becomes heat that the cooling system must reject.
   const itLoadKw = mwLoad * 1000;
-  const itEnergyKwhPerDay = itLoadKw * 24;
-  const evaporativeWithdrawalGalPerDay = itEnergyKwhPerDay * wue.value * GALLONS_PER_LITER;
-  const blowdownGalPerDay = isEvaporative
-    ? evaporativeWithdrawalGalPerDay / COOLING_TOWER_CYCLES_OF_CONCENTRATION
-    : 0;
-  const evaporativeConsumptionGalPerDay = isEvaporative
-    ? Math.max(0, evaporativeWithdrawalGalPerDay - blowdownGalPerDay)
-    : 0;
-
   const refrigerationTons = itLoadKw / KW_PER_REFRIGERATION_TON;
+
+  // Closed chilled-water loop: annualize conservative makeup + periodic service refill.
   const closedLoopVolumeGal = refrigerationTons * CLOSED_LOOP_GALLONS_PER_TON;
-  const closedLoopRoutineMakeupGalPerYear = closedLoopVolumeGal * CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION;
-  const closedLoopRefreshGalPerYear = closedLoopVolumeGal / CLOSED_LOOP_REFRESH_INTERVAL_YEARS;
+  const closedLoopRoutineMakeupGalPerYear =
+    closedLoopVolumeGal * CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION;
+  const closedLoopRefreshGalPerYear =
+    closedLoopVolumeGal / CLOSED_LOOP_REFRESH_INTERVAL_YEARS;
   const closedLoopAnnualizedGalPerDay =
     (closedLoopRoutineMakeupGalPerYear + closedLoopRefreshGalPerYear) / 365;
 
+  // DOE FEMP cooling-tower table: 4,930 gal/day per 100 tons at 4 COC.
+  const evaporativeMakeupGalPerDay =
+    refrigerationTons * COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC;
+  const evaporativeBlowdownGalPerDay =
+    evaporativeMakeupGalPerDay / COOLING_TOWER_CYCLES_OF_CONCENTRATION;
+  const evaporativeConsumptionGalPerDay =
+    Math.max(0, evaporativeMakeupGalPerDay - evaporativeBlowdownGalPerDay);
+
+  // DX, direct-to-chip + dry cooler, and immersion + dry cooler intentionally
+  // evaporate no cooling water in this model; routine cooling-process use is ~0.
   const withdrawalGalPerDay = isEvaporative
-    ? evaporativeWithdrawalGalPerDay
+    ? evaporativeMakeupGalPerDay
     : isClosedChilledWater
       ? closedLoopAnnualizedGalPerDay
       : 0;
@@ -129,51 +135,76 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
       ? closedLoopAnnualizedGalPerDay
       : 0;
 
+  const waterModelLabel = isAirCooledDx
+    ? "Air-cooled DX / dry heat rejection"
+    : isClosedChilledWater
+      ? "Closed chilled-water loop + air-cooled chiller"
+      : isEvaporative
+        ? "Evaporative cooling tower"
+        : isClosedLoopLiquid
+          ? "Direct-to-chip closed loop + dry cooler"
+          : isImmersion
+            ? "Immersion cooling + dry cooler"
+            : "Cooling water model";
+
+  const waterModelSource = isEvaporative
+    ? {
+        id: "doe-cooling-tower-water",
+        name: "U.S. DOE FEMP cooling-tower water-use method",
+        url: "https://www.energy.gov/cmei/femp/estimating-methods-determining-end-use-water-consumption",
+        methodology:
+          "DOE FEMP lists 4,930 gal/day for a 100-ton cooling tower at 4 cycles of concentration and 24-hour full-load operation; the model scales that published factor with refrigeration tonnage.",
+      }
+    : isClosedChilledWater
+      ? {
+          id: "ashrae-closed-hydronic-loop",
+          name: "ASHRAE closed hydronic loop guidance",
+          url: "https://handbook.ashrae.org/Handbooks/A23/SI/A23_Ch50/a23_ch50_si.aspx",
+          methodology:
+            "ASHRAE describes closed hydronic loops as typically requiring less than 5% makeup/year; the model uses 5%/year plus one full-loop refresh every 3 years, annualized.",
+        }
+      : {
+          id: "ashrae-dry-cooling",
+          name: "ASHRAE AI Data Center Energy Performance Framework",
+          url: "https://www.ashrae.org/technical-resources/ai-data-center-framework/integrated-design-principles",
+          methodology:
+            "Dry heat-rejection / closed-loop cooling is modeled with virtually zero routine cooling-process water because water is not intentionally evaporated.",
+        };
+
   return {
     estimatedConsumptionGalPerDay: {
-      label: isClosedChilledWater ? "Annualized closed-loop water input" : "Estimated water consumption",
+      label: isEvaporative ? "Estimated cooling-water consumption" : "Annualized cooling-process water",
       value: Math.round(consumptionGalPerDay),
       unit: "gal/day",
       confidence: "estimated",
-      source: {
-        id: "wue-model",
-        name: isClosedChilledWater ? "Closed-loop hydronic water model" : "WUE-based cooling water model",
-        url: isClosedChilledWater ? "https://handbook.ashrae.org/Handbooks/A23/SI/A23_Ch50/a23_ch50_si.aspx" : "https://www.energy.gov/cmei/femp/cooling-water-efficiency-opportunities-federal-data-centers",
-        methodology: isEvaporative
-          ? `${mwLoad} MW IT load × 24h × ${wue.value} L/kWh site WUE (${wue.label}), converted to gallons, then subtracting modeled blowdown at ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration to estimate consumptive loss.`
-          : isClosedChilledWater
-            ? `${mwLoad} MW IT load ≈ ${Math.round(refrigerationTons).toLocaleString()} refrigeration tons; estimated loop inventory ${Math.round(closedLoopVolumeGal).toLocaleString()} gal at ${CLOSED_LOOP_GALLONS_PER_TON} gal/ton. Annualized water input = ${Math.round(CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100)}% routine makeup/year + one full-loop maintenance refresh every ${CLOSED_LOOP_REFRESH_INTERVAL_YEARS} years.`
-            : "Dry-rejection cooling technology with no modeled routine cooling-process water use.",
-      },
-      caveats: isClosedChilledWater
+      source: waterModelSource,
+      caveats: isEvaporative
         ? [
-            `ASHRAE describes closed hydronic loops as typically requiring less than 5% makeup per year; this model uses 5% as a conservative upper-bound planning value.`,
-            `The ${CLOSED_LOOP_REFRESH_INTERVAL_YEARS}-year full refresh is an explicit planning assumption, not a universal manufacturer requirement. Actual service intervals depend on fluid chemistry and equipment.`,
-            "This is an annualized average: actual additions occur intermittently, not as a steady daily flow.",
+            `DOE factor assumes 24/7 full-load operation at ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration; actual use varies with utilization, weather, economizer hours, and water chemistry.`,
+            "Cooling towers intentionally evaporate water, so hyperscale evaporative systems can legitimately use hundreds of thousands to millions of gallons per day.",
           ]
-        : [
-            "Model estimate, not a site-specific engineering study.",
-            isEvaporative
-              ? `Cooling-tower consumption assumes ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration; actual cycles depend on make-up water chemistry and treatment.`
-              : "Routine cooling-process water only; domestic water, humidification, fire systems, initial loop fill, and maintenance losses are excluded.",
-          ],
+        : isClosedChilledWater
+          ? [
+              `Estimated loop inventory: ~${Math.round(closedLoopVolumeGal).toLocaleString()} gal at ${CLOSED_LOOP_GALLONS_PER_TON} gal/ton.`,
+              `Annualized average includes ${Math.round(CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100)}% routine makeup/year plus one full-loop refresh every ${CLOSED_LOOP_REFRESH_INTERVAL_YEARS} years; actual additions occur intermittently.`,
+            ]
+          : [
+              "ASHRAE describes dry closed-loop heat rejection as virtually zero-water for cooling. This excludes domestic water, humidification, fire systems, commissioning fills, leaks, and optional adiabatic assist.",
+            ],
     },
     estimatedWithdrawalGalPerDay: {
-      label: isClosedChilledWater ? "Annualized closed-loop water supply" : "Estimated water withdrawal",
+      label: isEvaporative ? "Estimated cooling-water makeup" : "Annualized cooling-water supply",
       value: Math.round(withdrawalGalPerDay),
       unit: "gal/day",
       confidence: "estimated",
-      source: {
-        id: "wue-model",
-        name: "WUE-based cooling water model",
-        url: "",
-        methodology: isClosedChilledWater ? "Annualized closed-loop water input from routine makeup plus periodic maintenance refresh." : "For evaporative cooling, site water use is calculated directly from WUE × IT-equipment energy.",
-      },
+      source: waterModelSource,
       caveats: isEvaporative
-        ? [`At ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration, roughly ${Math.round(100 / COOLING_TOWER_CYCLES_OF_CONCENTRATION)}% of make-up water is modeled as blowdown rather than consumptive loss.`]
+        ? [
+            `Makeup = evaporation + blowdown (+ minor drift). At ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles, modeled blowdown is ~${Math.round(100 / COOLING_TOWER_CYCLES_OF_CONCENTRATION)}% of makeup.`,
+          ]
         : isClosedChilledWater
-          ? ["Annualized average; actual closed-loop makeup/refill happens intermittently during service events."]
-          : ["Routine cooling-process water only; this is not total facility potable-water demand."],
+          ? ["Annualized average; actual closed-loop makeup/refill occurs during maintenance or small loss events, not as a steady withdrawal."]
+          : ["No routine cooling-water withdrawal is modeled for dry heat rejection."],
     },
     nearestWaterBody: {
       distanceMiles: nearestWater.distanceMiles,
@@ -208,16 +239,15 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
       ],
     },
     wueAssumption: {
-      label: `WUE assumption (${wue.label})`,
-      value: wue.value,
-      unit: "L/kWh",
+      label: `Water model — ${waterModelLabel}`,
+      value: isEvaporative
+        ? COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC
+        : isClosedChilledWater
+          ? CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100
+          : 0,
+      unit: isEvaporative ? "gal/ton-day" : isClosedChilledWater ? "% makeup/yr" : "gal/day routine",
       confidence: "estimated",
-      source: {
-        id: "wue-reference",
-        name: "Industry-published WUE reference values",
-        url: "",
-        methodology: wue.description,
-      },
+      source: waterModelSource,
     },
   };
 }
