@@ -75,15 +75,6 @@ const ROWS: { section: string; color: string; note?: string; rows: Row[] }[] = [
         better: "lower",
       },
       { label: "Utility territory", get: (a) => ({ value: a.power.utilityTerritory.value, confidence: a.power.utilityTerritory.confidence }) },
-      {
-        label: "Nearby generation",
-        get: (a) => ({
-          value: a.power.nearbyGeneration.value ? `${Math.round(a.power.nearbyGeneration.value.totalMw)} MW` : null,
-          confidence: a.power.nearbyGeneration.confidence,
-        }),
-        rank: (a) => a.power.nearbyGeneration.value?.totalMw ?? null,
-        better: "higher",
-      },
     ],
   },
   {
@@ -160,26 +151,11 @@ const ROWS: { section: string; color: string; note?: string; rows: Row[] }[] = [
         rank: (a) => a.noise.noiseImpactScore.value,
         better: "lower",
       },
-      { label: "FEMA flood zone", get: (a) => ({ value: a.land.femaFloodZone.value, confidence: a.land.femaFloodZone.confidence }) },
       {
         label: "Environmental constraints flagged",
         get: (a) => ({ value: a.land.environmentalConstraints.value.length, confidence: a.land.environmentalConstraints.confidence }),
         rank: (a) => a.land.environmentalConstraints.value.length,
         better: "lower",
-      },
-      {
-        label: "Population within 5 mi",
-        get: (a) => ({
-          value: a.land.populationWithin5mi.value != null ? a.land.populationWithin5mi.value.toLocaleString() : null,
-          confidence: a.land.populationWithin5mi.confidence,
-        }),
-      },
-      {
-        label: "Nearest state highway",
-        get: (a) => ({
-          value: a.land.nearestMajorRoadMiles.value != null ? `${a.land.nearestMajorRoadMiles.value} mi` : null,
-          confidence: a.land.nearestMajorRoadMiles.confidence,
-        }),
       },
       { label: "County", get: (a) => ({ value: a.regulation.county.value, confidence: a.regulation.county.confidence }) },
     ],

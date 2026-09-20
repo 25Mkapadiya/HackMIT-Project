@@ -50,15 +50,6 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
         <MetricRow metric={power.utilityTerritory} />
         <MetricRow
           metric={{
-            ...power.nearbyGeneration,
-            value: power.nearbyGeneration.value
-              ? `${Math.round(power.nearbyGeneration.value.totalMw).toLocaleString()} MW (${power.nearbyGeneration.value.count} facilities)`
-              : null,
-          }}
-        />
-        <MetricRow metric={power.gridCapacity} />
-        <MetricRow
-          metric={{
             ...power.gridDemandPressure,
             value: power.gridDemandPressure.value
               ? `${power.gridDemandPressure.demandPressureLabel} (${power.gridDemandPressure.value.countyName ?? "county"}, ~${Math.round(power.gridDemandPressure.value.densityPerSqMi ?? 0).toLocaleString()}/sq mi)`
@@ -99,7 +90,6 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
       </Section>
 
       <Section title="Fiber / Connectivity" color="#9b6ef2">
-        <MetricRow metric={fiber.broadbandContext} />
         <DistanceRow label="Nearest colo / IX facility" result={fiber.nearestIxp} />
         <MetricRow metric={fiber.longHaulFiberAvailability} />
       </Section>
@@ -110,10 +100,7 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
       </Section>
 
       <Section title="Environment / Land" color="#3bf2a0">
-        <MetricRow metric={land.femaFloodZone} />
         <MetricRow metric={land.elevationFt} />
-        <MetricRow metric={land.nearestMajorRoadMiles} />
-        <MetricRow metric={land.populationWithin5mi} />
         <MetricRow metric={{ ...land.environmentalConstraints, value: land.environmentalConstraints.value.join(" ") }} />
       </Section>
 
