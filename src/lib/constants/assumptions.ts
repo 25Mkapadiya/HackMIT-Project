@@ -130,6 +130,16 @@ export const NEARBY_GENERATION_RADIUS_MI = 25;
 export const POPULATION_RADIUS_MI = 5;
 export const IXP_SEARCH_RADIUS_MI = 100;
 
+/**
+ * Search radius (miles) for the nearest Interstate highway or active rail
+ * line, used as a geographic PROXY for likely long-haul fiber routes (see
+ * FiberAnalysis.longHaulFiberAvailability) — carriers commonly, not
+ * universally, bury long-haul conduit within these rights-of-way. No public
+ * nationwide dataset of actual carrier fiber routes exists, so this is a
+ * corridor-proximity signal, not a fiber survey.
+ */
+export const LONG_HAUL_CORRIDOR_SEARCH_RADIUS_MI = 25;
+
 /** Voltage thresholds (kV) used when classifying BPA transmission line tiers. */
 export const VOLTAGE_TIERS = {
   min: 0,

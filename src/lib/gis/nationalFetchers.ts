@@ -108,6 +108,27 @@ export async function fetchColocationFacilities(bbox: Bbox, stateAbbr: string): 
   return { type: "FeatureCollection", features };
 }
 
+/**
+ * Interstate highway centerlines — see NATIONAL_SOURCES.tigerInterstates for
+ * why this stands in as a corridor proxy for likely long-haul fiber routes.
+ */
+export async function fetchInterstateHighways(bbox: Bbox) {
+  return queryArcGisGeoJSON<{ NAME?: string }>(
+    NATIONAL_SOURCES.tigerInterstates.url,
+    { bbox, where: "RTTYP='I'", outFields: "NAME,RTTYP" },
+    TTL.ONE_DAY
+  );
+}
+
+/** Active rail line centerlines — same corridor-proxy role as fetchInterstateHighways above. */
+export async function fetchRailroads(bbox: Bbox) {
+  return queryArcGisGeoJSON<{ NAME?: string }>(
+    NATIONAL_SOURCES.tigerRailroads.url,
+    { bbox, outFields: "NAME,MTFCC" },
+    TTL.ONE_DAY
+  );
+}
+
 // ----------------------------------------------------------- ENVIRONMENT (nationwide)
 
 export async function fetchFemaFloodZones(bbox: Bbox) {

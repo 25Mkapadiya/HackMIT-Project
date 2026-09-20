@@ -129,14 +129,8 @@ export const WA_SOURCES = {
     refreshFrequency: "Varies by dataset (generally monthly/annual)",
     methodology: "Server-side query using an EIA API key; requires EIA_API_KEY to be configured.",
   },
-  fccBroadband: {
-    id: "fcc-broadband-map",
-    name: "FCC National Broadband Map (BDC)",
-    url: "https://broadbandmap.fcc.gov/",
-    license: "Public (FCC)",
-    refreshFrequency: "Semiannual BDC collection",
-    methodology: "Retail fixed-broadband availability by provider/technology at a location — a proxy for connectivity, not long-haul fiber routes. Requires FCC_BDC_API_KEY.",
-  },
+  fccBroadband: NATIONAL_SOURCES.fccBroadband,
+  censusBroadband: NATIONAL_SOURCES.censusBroadband,
   cartoForestCover: {
     id: "carto-osm-forest-cover",
     name: "CARTO Vector Basemap — OSM Landcover (wood)",
