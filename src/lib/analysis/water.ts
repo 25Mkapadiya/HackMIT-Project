@@ -159,7 +159,7 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
           ],
     },
     estimatedWithdrawalGalPerDay: {
-      label: "Estimated water withdrawal",
+      label: isClosedChilledWater ? "Annualized closed-loop water supply" : "Estimated water withdrawal",
       value: Math.round(withdrawalGalPerDay),
       unit: "gal/day",
       confidence: "estimated",
