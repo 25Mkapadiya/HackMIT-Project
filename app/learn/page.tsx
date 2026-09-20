@@ -171,7 +171,7 @@ export default function LearnPage() {
             Understanding Data Centers
           </h1>
           <p className="mt-4 text-[15px] sm:text-[18px] font-medium text-ink-300 max-w-2xl mx-auto">
-            The infrastructure behind the digital world — and the communities that host it.
+            The infrastructure behind the digital world.
           </p>
           <p className="mt-5 text-[13px] sm:text-[14.5px] text-ink-500 leading-relaxed max-w-2xl mx-auto">
             Data centers are the physical infrastructure that powers cloud computing, artificial intelligence,
@@ -187,12 +187,6 @@ export default function LearnPage() {
           <FlowStep label="Data Center" sub="Compute + storage" />
           <FlowArrow direction="right" />
           <FlowStep label="Digital Services" sub="AI, cloud, streaming" />
-        </Reveal>
-
-        <Reveal delay={160} className="mt-8 text-center">
-          <span className="inline-block text-[12.5px] sm:text-[13px] font-semibold text-ink-100 px-4 py-2 rounded-full border border-base-700 bg-base-900/60 glass-panel">
-            Every digital action has a physical footprint.
-          </span>
         </Reveal>
       </Section>
 
