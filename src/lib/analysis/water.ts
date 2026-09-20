@@ -3,7 +3,7 @@ import type { ScenarioConfig, WaterAnalysis } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, featuresWithinRadius, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
-import { CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION, CLOSED_LOOP_GALLONS_PER_TON, CLOSED_LOOP_REFRESH_INTERVAL_YEARS, COOLING_TOWER_CYCLES_OF_CONCENTRATION, COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC, KW_PER_REFRIGERATION_TON } from "@/lib/constants/assumptions";
+import { CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION, CLOSED_LOOP_GALLONS_PER_TON, CLOSED_LOOP_REFRESH_INTERVAL_YEARS, COOLING_TOWER_CYCLES_OF_CONCENTRATION, COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC, EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH, GALLONS_PER_LITER, KW_PER_REFRIGERATION_TON } from "@/lib/constants/assumptions";
 
 /** D0 (abnormally dry) through D4 (exceptional drought) — US Drought Monitor classification labels. */
 const USDM_LABELS = [
@@ -113,13 +113,24 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   const closedLoopAnnualizedGalPerDay =
     (closedLoopRoutineMakeupGalPerYear + closedLoopRefreshGalPerYear) / 365;
 
-  // DOE FEMP cooling-tower table: 4,930 gal/day per 100 tons at 4 COC.
-  const evaporativeMakeupGalPerDay =
-    refrigerationTons * COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC;
-  const evaporativeBlowdownGalPerDay =
-    evaporativeMakeupGalPerDay / COOLING_TOWER_CYCLES_OF_CONCENTRATION;
+  // Annual-average evaporative operating estimate uses an empirical US
+  // operator benchmark rather than assuming the cooling tower is at full
+  // mechanical load 24/7/365. Microsoft reports FY25 Americas WUE = 0.34 L/kWh.
+  const itEnergyKwhPerDay = itLoadKw * 24;
   const evaporativeConsumptionGalPerDay =
-    Math.max(0, evaporativeMakeupGalPerDay - evaporativeBlowdownGalPerDay);
+    itEnergyKwhPerDay *
+    EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary *
+    GALLONS_PER_LITER;
+
+  // Keep the DOE tower calculation as a transparent peak/design upper bound.
+  const evaporativePeakMakeupGalPerDay =
+    refrigerationTons * COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC;
+  const evaporativePeakBlowdownGalPerDay =
+    evaporativePeakMakeupGalPerDay / COOLING_TOWER_CYCLES_OF_CONCENTRATION;
+
+  // Withdrawal is not displayed as a precise value for the empirical WUE model:
+  // provider definitions differ and WUE is the better directly reported metric.
+  const evaporativeMakeupGalPerDay = evaporativeConsumptionGalPerDay;
 
   // DX, direct-to-chip + dry cooler, and immersion + dry cooler intentionally
   // evaporate no cooling water in this model; routine cooling-process use is ~0.
@@ -150,10 +161,10 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   const waterModelSource = isEvaporative
     ? {
         id: "doe-cooling-tower-water",
-        name: "U.S. DOE FEMP cooling-tower water-use method",
-        url: "https://www.energy.gov/cmei/femp/estimating-methods-determining-end-use-water-consumption",
+        name: "Empirical US data-center WUE benchmark",
+        url: "https://datacenters.microsoft.com/sustainability/efficiency/",
         methodology:
-          "DOE FEMP lists 4,930 gal/day for a 100-ton cooling tower at 4 cycles of concentration and 24-hour full-load operation; the model scales that published factor with refrigeration tonnage.",
+          `Primary operating estimate uses Microsoft FY25 Americas WUE ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary} L/kWh applied to IT energy. Observed operator context: Meta 2024 ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.low} L/kWh and Google 2024 ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.high} L/kWh. DOE full-load cooling-tower math is retained only as a peak/design upper bound (~${Math.round(evaporativePeakMakeupGalPerDay).toLocaleString()} gal/day makeup at this load).`,
       }
     : isClosedChilledWater
       ? {
@@ -180,8 +191,8 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
       source: waterModelSource,
       caveats: isEvaporative
         ? [
-            `DOE factor assumes 24/7 full-load operation at ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration; actual use varies with utilization, weather, economizer hours, and water chemistry.`,
-            "Cooling towers intentionally evaporate water, so hyperscale evaporative systems can legitimately use hundreds of thousands to millions of gallons per day.",
+            `Displayed value is an annual-average operating benchmark using Microsoft FY25 Americas WUE (${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary} L/kWh), not a full-load cooling-tower maximum.`,
+            `Observed operator WUE spans roughly ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.low}-${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.high} L/kWh across Meta, Microsoft, and Google; actual site use varies substantially by climate, utilization, economizer hours, and cooling design.`,
           ]
         : isClosedChilledWater
           ? [
@@ -193,14 +204,14 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
             ],
     },
     estimatedWithdrawalGalPerDay: {
-      label: isEvaporative ? "Estimated cooling-water makeup" : "Annualized cooling-water supply",
+      label: isEvaporative ? "Estimated operating water use" : "Annualized cooling-water supply",
       value: Math.round(withdrawalGalPerDay),
       unit: "gal/day",
       confidence: "estimated",
       source: waterModelSource,
       caveats: isEvaporative
         ? [
-            `Makeup = evaporation + blowdown (+ minor drift). At ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles, modeled blowdown is ~${Math.round(100 / COOLING_TOWER_CYCLES_OF_CONCENTRATION)}% of makeup.`,
+            `This duplicates the empirical operating WUE-based water-use estimate rather than presenting a false-precision withdrawal number. DOE peak-design context: ~${Math.round(evaporativePeakMakeupGalPerDay).toLocaleString()} gal/day makeup and ~${Math.round(evaporativePeakBlowdownGalPerDay).toLocaleString()} gal/day blowdown at full cooling-tower load.`,
           ]
         : isClosedChilledWater
           ? ["Annualized average; actual closed-loop makeup/refill occurs during maintenance or small loss events, not as a steady withdrawal."]
@@ -241,11 +252,11 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
     wueAssumption: {
       label: `Water model — ${waterModelLabel}`,
       value: isEvaporative
-        ? COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC
+        ? EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary
         : isClosedChilledWater
           ? CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100
           : 0,
-      unit: isEvaporative ? "gal/ton-day" : isClosedChilledWater ? "% makeup/yr" : "gal/day routine",
+      unit: isEvaporative ? "L/kWh WUE" : isClosedChilledWater ? "% makeup/yr" : "gal/day routine",
       confidence: "estimated",
       source: waterModelSource,
     },
