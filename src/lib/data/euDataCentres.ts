@@ -29,7 +29,7 @@ export interface EuCountryRow {
 }
 
 // [code, name, estimated, reporting, PDIT, EDC, WIN, PUE, WUE, ERF, REF]
-type Raw = [string, string, number, number, number, number, number, number, number | null, number | null, number];
+type Raw = [string, string, number, number, number, number, number | null, number, number | null, number | null, number];
 
 const RAW: Raw[] = [
   ["AT", "Austria", 47, 11, 16.14, 111.1, 6288, 1.5, 0.14, 0.006, 0.58],
@@ -42,13 +42,16 @@ const RAW: Raw[] = [
   ["FI", "Finland", 72, 25, 219.67, 1091.18, 8599, 1.17, 0.07, 0.457, 1.0],
   ["FR", "France", 264, 133, 1311.43, 2416.9, 399147, 1.55, 0.25, 0.1, 0.8],
   ["HR", "Croatia", 19, 1, 0.88, 7.71, 280, 1.38, 0.05, null, 0.0],
-  ["HU", "Hungary", 19, 1, 0.53, 6.52, 0, 2.0, null, 0.057, 0.0],
+  // WIN is null (not 0) for HU/LT/MT: their WUE (Table 26) is also unreported (null)
+  // on these same rows, and every other country with a real WIN also has a real WUE —
+  // so a literal 0 here would misreport "no data" as "confirmed zero water use."
+  ["HU", "Hungary", 19, 1, 0.53, 6.52, null, 2.0, null, 0.057, 0.0],
   ["IE", "Ireland", 123, 18, 315.92, 1411.76, 626594, 1.18, 0.64, null, 0.99],
   ["IT", "Italy", 178, 23, 92.02, 350.24, 78351, 1.46, 0.7, 0.217, 0.8],
-  ["LT", "Lithuania", 18, 3, 2.3, 18.0, 0, 1.28, null, null, 0.81],
+  ["LT", "Lithuania", 18, 3, 2.3, 18.0, null, 1.28, null, null, 0.81],
   ["LU", "Luxembourg", 14, 2, 11.2, 53.22, 12279, 1.37, 0.32, 0.0, 0.25],
   ["LV", "Latvia", 25, 1, 0.7, 6.3, 60, 1.4, 0.01, 0.039, 0.84],
-  ["MT", "Malta", 8, 1, 0.64, 7.95, 0, 1.4, null, null, 0.0],
+  ["MT", "Malta", 8, 1, 0.64, 7.95, null, 1.4, null, null, 0.0],
   ["NL", "Netherlands", 192, 85, 102.76, 574.87, 1356210, 1.39, 0.66, 0.068, 0.79],
   ["PL", "Poland", 87, 36, 59.05, 276.55, 20359, 1.55, 0.21, 0.0, 0.59],
   ["PT", "Portugal", 42, 4, 7.67, 48.75, 27919, 1.58, 0.98, 0.006, 0.36],
@@ -68,7 +71,7 @@ export const EU_COUNTRIES: EuCountryRow[] = RAW.map((r) => ({
     // always reads as ~0 next to e.g. Belgium's 1.24M m³/yr total). Dividing by the
     // reporting-data-centre count puts it on the same per-facility basis GraphPanel
     // computes for a scenario (see scenarioValues's `win` in GraphPanel.tsx).
-    win: r[3] > 0 ? r[6] / r[3] : null,
+    win: r[6] != null && r[3] > 0 ? r[6] / r[3] : null,
     pue: r[7],
     wue: r[8],
     erf: r[9],
