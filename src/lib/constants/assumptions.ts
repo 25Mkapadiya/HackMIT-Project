@@ -255,5 +255,31 @@ export const PUE_DENSITY_ADJUSTMENT: Record<"Low" | "Moderate" | "High" | "Very 
  */
 export const PUE_WATER_STRESS_CONSTRAINT_DELTA = 0.1;
 
+/**
+ * Modeled PUE adjustment from proximity to the nearest known substation or
+ * high-voltage (115kV+) transmission line — see PowerAnalysis.nearestSubstation
+ * / nearest115kv / nearest230kv / nearest500kv. Like PUE_DENSITY_ADJUSTMENT,
+ * this is NOT a measured statistical correlation: no public dataset joins
+ * per-facility PUE to interconnection distance. It's a directional nudge
+ * reflecting documented hyperscale siting practice instead — operators favor
+ * parcels immediately adjacent to a substation or high-voltage line precisely
+ * because a short, direct interconnection avoids a long dedicated line
+ * extension or private switchyard build, keeps transformation/line losses
+ * inside the utility's side of the meter, and supports the larger,
+ * purpose-built single-tenant designs that achieve the best published PUE.
+ * A distant site instead usually means a longer utility-built or
+ * developer-funded tie line, more owned step-up/step-down infrastructure
+ * inside the facility boundary, and often a smaller or staged build —
+ * nudging design toward the less-optimized end of the published range.
+ * Bands reuse TRANSMISSION_PROXIMITY_BANDS (miles).
+ */
+export const PUE_GRID_PROXIMITY_ADJUSTMENT: Record<"Very Close" | "Close" | "Moderate" | "Far" | "Unknown", number> = {
+  "Very Close": 0,
+  Close: 0.02,
+  Moderate: 0.05,
+  Far: 0.09,
+  Unknown: 0,
+};
+
 /** Square feet in one acre. */
 export const SQ_FT_PER_ACRE = 43560;
