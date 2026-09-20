@@ -20,6 +20,9 @@ const inputCls =
   "w-full bg-base-900 border border-base-700 rounded-md px-2.5 py-1.5 text-[12.5px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent-power/50 focus:border-accent-power/50";
 const labelCls = "text-[10.5px] uppercase tracking-[0.06em] text-ink-500 mb-1 block";
 
+const coolingSummary = (technology: ScenarioConfig["coolingTechnology"]) =>
+  COOLING_TECH_OPTIONS.find((option) => option.value === technology)?.summary ?? "";
+
 export default function ScenarioConfigForm({
   scenario,
   onChange,
@@ -93,6 +96,9 @@ export default function ScenarioConfigForm({
             </option>
           ))}
         </select>
+        <div className="mt-2 rounded-md border border-base-800 bg-base-900/60 px-2.5 py-2 text-[11px] leading-relaxed text-ink-400">
+          {coolingSummary(scenario.coolingTechnology)}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
