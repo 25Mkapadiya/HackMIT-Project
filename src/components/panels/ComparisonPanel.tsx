@@ -191,7 +191,7 @@ const ROWS: { section: string; color: string; note?: string; rows: Row[] }[] = [
     section: "Development",
     color: "#c9d3e0",
     rows: [
-      { label: "Est. acreage", get: (a) => ({ value: `${a.development.acreage.value} ac`, confidence: a.development.acreage.confidence }) },
+      { label: "Est. site area", get: (a) => ({ value: `${a.development.acreage.value.toLocaleString()} sq ft`, confidence: a.development.acreage.confidence }) },
       {
         label: "Infra. gaps flagged",
         get: (a) => ({ value: a.gaps.length, confidence: "fact" }),

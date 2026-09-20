@@ -4,7 +4,7 @@ import type { LandAnalysis, ScenarioConfig } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, milesBetween, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
-import { ACREAGE_PER_MW, POPULATION_RADIUS_MI } from "@/lib/constants/assumptions";
+import { ACREAGE_PER_MW, POPULATION_RADIUS_MI, SQ_FT_PER_ACRE } from "@/lib/constants/assumptions";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
@@ -203,14 +203,14 @@ export async function computeLandAnalysis(scenario: ScenarioConfig): Promise<Lan
     },
     estimatedAcreage: {
       label: "Estimated site footprint",
-      value: acreage,
-      unit: "acres",
+      value: Math.round(acreage * SQ_FT_PER_ACRE),
+      unit: "sq ft",
       confidence: "estimated",
       source: {
         id: "acreage-model",
         name: "Acreage-per-MW reference model",
         url: "",
-        methodology: `${ACREAGE_PER_MW.typical} acres/MW (typical) × ${mwLoad} MW IT load.`,
+        methodology: `${ACREAGE_PER_MW.typical} acres/MW (typical) × ${mwLoad} MW IT load, shown in square feet (1 acre = ${SQ_FT_PER_ACRE.toLocaleString()} sq ft).`,
       },
     },
   };

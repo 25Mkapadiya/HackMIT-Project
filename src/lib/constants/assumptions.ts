@@ -197,3 +197,6 @@ export const PUE_DENSITY_ADJUSTMENT: Record<"Low" | "Moderate" | "High" | "Very 
  * slightly for the added friction of a forced late redesign.
  */
 export const PUE_WATER_STRESS_CONSTRAINT_DELTA = 0.1;
+
+/** Square feet in one acre. */
+export const SQ_FT_PER_ACRE = 43560;

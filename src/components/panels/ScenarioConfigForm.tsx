@@ -1,6 +1,7 @@
 "use client";
 
 import type { ScenarioConfig } from "@/lib/types";
+import { SQ_FT_PER_ACRE } from "@/lib/constants/assumptions";
 import { COOLING_TECH_OPTIONS, REDUNDANCY_OPTIONS } from "@/lib/constants/options";
 
 const inputCls =
@@ -112,12 +113,21 @@ export default function ScenarioConfigForm({
       </div>
 
       <div>
-        <label className={labelCls}>Facility Acreage (optional override)</label>
+        <label className={labelCls}>Facility Area, sq ft (optional override)</label>
         <input
           type="number"
+          min={0}
+          step="any"
           placeholder="Auto-estimated"
-          value={scenario.acreageOverride ?? ""}
-          onChange={(e) => onChange({ acreageOverride: e.target.value ? Number(e.target.value) : undefined })}
+          value={scenario.acreageOverride != null ? Math.round(scenario.acreageOverride * SQ_FT_PER_ACRE * 100) / 100 : ""}
+          onKeyDown={(e) => {
+            if (e.key === "-" || e.key === "e" || e.key === "E") e.preventDefault();
+          }}
+          onChange={(e) => {
+            const sqFt = Number(e.target.value);
+            // Blank or negative input clears the override; the area can never be below zero.
+            onChange({ acreageOverride: e.target.value && sqFt >= 0 ? sqFt / SQ_FT_PER_ACRE : undefined });
+          }}
           className={inputCls}
         />
       </div>
