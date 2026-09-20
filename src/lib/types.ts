@@ -153,6 +153,25 @@ export interface WaterAnalysis {
   wueAssumption: Metric<number>;
 }
 
+export interface PueFactor {
+  label: string;
+  /** This factor's contribution to the estimated PUE — the base cooling-tech figure for the first factor, a signed adjustment for the rest. */
+  deltaPue: number;
+  rationale: string;
+}
+
+/**
+ * Modeled (not measured) estimate of Power Usage Effectiveness, built from
+ * published industry benchmarks and adjusted for local population-density
+ * "grid demand pressure" and water-stress cooling constraints. See
+ * src/lib/analysis/efficiency.ts for the full methodology and citations —
+ * no public dataset joins per-facility PUE to county population data, so this
+ * is a transparent heuristic, never presented as a measured correlation.
+ */
+export interface EfficiencyAnalysis {
+  estimatedPue: Metric<number> & { factors: PueFactor[] };
+}
+
 export interface LandAnalysis {
   femaFloodZone: Metric<string | null>;
   elevationFt: Metric<number | null>;
@@ -181,6 +200,7 @@ export interface ScenarioAnalysis {
   power: PowerAnalysis;
   fiber: FiberAnalysis;
   regulation: RegulationAnalysis;
+  efficiency: EfficiencyAnalysis;
   water: WaterAnalysis;
   land: LandAnalysis;
   development: DevelopmentEstimate;

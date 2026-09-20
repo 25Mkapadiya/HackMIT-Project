@@ -3,12 +3,7 @@ import type { ScenarioConfig, WaterAnalysis } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, featuresWithinRadius, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
-import {
-  ASSUMED_PUE,
-  COOLING_TECH_TO_WUE_KEY,
-  GALLONS_PER_LITER,
-  WUE_L_PER_KWH,
-} from "@/lib/constants/assumptions";
+import { COOLING_TECH_TO_WUE_KEY, GALLONS_PER_LITER, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
 
 /** D0 (abnormally dry) through D4 (exceptional drought) — US Drought Monitor classification labels. */
 const USDM_LABELS = [
@@ -19,7 +14,59 @@ const USDM_LABELS = [
   "D4 – Exceptional drought",
 ];
 
-export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<WaterAnalysis> {
+/**
+ * Data-shape-driven, not state-name-driven: a drought layer that carries a
+ * numeric DM property (US Drought Monitor's D0-D4 severity scale, used by
+ * Oklahoma and any future state that reuses it) gets interpreted as a
+ * severity level; a boolean declared-area layer (Washington's Ecology
+ * drought-areas layer) falls back to the original in/out-of-drought-area logic.
+ */
+function deriveWaterStress(
+  droughtFeature: { properties?: { DM?: number } } | null,
+  rightsNearbyCount: number
+): { waterStress: "Low" | "Medium" | "High" | "Unknown"; droughtStatusText: string } {
+  const dm = droughtFeature?.properties?.DM;
+  if (typeof dm === "number") {
+    return {
+      droughtStatusText: USDM_LABELS[dm] ?? `D${dm}`,
+      waterStress: dm >= 3 ? "High" : dm >= 1 ? "Medium" : "Low",
+    };
+  }
+  const inDrought = droughtFeature != null;
+  return {
+    droughtStatusText: inDrought ? "Within a declared drought area" : "No active declared drought area at this location",
+    waterStress: inDrought ? "High" : rightsNearbyCount >= 15 ? "Medium" : "Low",
+  };
+}
+
+/**
+ * Lightweight water-stress-only lookup (drought + nearby water-right density),
+ * split out from the full water analysis so efficiency.ts can factor water
+ * stress into its estimated-PUE model without waiting on (or duplicating) the
+ * full water analysis, which itself needs that estimated PUE for its
+ * consumption/withdrawal figures. Re-fetches the same drought/rights data
+ * computeWaterAnalysis fetches — both hit the same per-bbox ArcGIS cache
+ * entry (see arcgis.ts), so this never costs a second network round trip.
+ */
+export async function computeWaterStressContext(
+  scenario: ScenarioConfig
+): Promise<{ waterStress: "Low" | "Medium" | "High" | "Unknown" }> {
+  const { lng, lat, stateId } = scenario;
+  const rightsBbox = bboxAroundMiles(lng, lat, 10);
+  const droughtBbox = bboxAroundMiles(lng, lat, 20);
+
+  const [rightsFc, droughtFc] = await Promise.all([
+    getFetcher(stateId, "water-diversions")(rightsBbox) as Promise<FeatureCollection<Geometry, Record<string, unknown>>>,
+    getFetcher(stateId, "drought-areas")(droughtBbox) as Promise<FeatureCollection<Geometry, { DM?: number }>>,
+  ]);
+
+  const rightsNearby = featuresWithinRadius(lng, lat, rightsFc, 10);
+  const droughtFeature = polygonContaining(lng, lat, droughtFc);
+  const { waterStress } = deriveWaterStress(droughtFeature, rightsNearby.length);
+  return { waterStress };
+}
+
+export async function computeWaterAnalysis(scenario: ScenarioConfig, estimatedPue: number): Promise<WaterAnalysis> {
   const { lng, lat, mwLoad, coolingTechnology, stateId } = scenario;
   const bundle = getStateGisBundle(stateId);
   const hasWaterRightsLayer = Boolean(bundle.fetchers["water-diversions"]);
@@ -45,28 +92,12 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
 
   const rightsNearby = featuresWithinRadius(lng, lat, rightsFc, 10);
   const droughtFeature = polygonContaining(lng, lat, droughtFc);
-
-  // Data-shape-driven, not state-name-driven: a drought layer that carries a
-  // numeric DM property (US Drought Monitor's D0-D4 severity scale, used by
-  // Oklahoma and any future state that reuses it) gets interpreted as a
-  // severity level; a boolean declared-area layer (Washington's Ecology
-  // drought-areas layer) falls back to the original in/out-of-drought-area logic.
-  let waterStress: "Low" | "Medium" | "High" | "Unknown" = "Low";
-  let droughtStatusText: string;
-  const dm = droughtFeature?.properties?.DM;
-  if (typeof dm === "number") {
-    droughtStatusText = USDM_LABELS[dm] ?? `D${dm}`;
-    waterStress = dm >= 3 ? "High" : dm >= 1 ? "Medium" : "Low";
-  } else {
-    const inDrought = droughtFeature != null;
-    droughtStatusText = inDrought ? "Within a declared drought area" : "No active declared drought area at this location";
-    waterStress = inDrought ? "High" : rightsNearby.length >= 15 ? "Medium" : "Low";
-  }
+  const { waterStress, droughtStatusText } = deriveWaterStress(droughtFeature, rightsNearby.length);
 
   const wueKey = COOLING_TECH_TO_WUE_KEY[coolingTechnology] ?? "us_average";
   const wue = WUE_L_PER_KWH[wueKey] ?? WUE_L_PER_KWH.us_average;
 
-  const facilityLoadKw = mwLoad * 1000 * ASSUMED_PUE;
+  const facilityLoadKw = mwLoad * 1000 * estimatedPue;
   const kwhPerDay = facilityLoadKw * 24;
   const litersPerDay = kwhPerDay * wue.value;
   const gallonsPerDay = litersPerDay * GALLONS_PER_LITER;
@@ -83,10 +114,11 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
         id: "wue-model",
         name: "WUE-based cooling water model",
         url: "",
-        methodology: `PUE ${ASSUMED_PUE} × ${mwLoad} MW IT load × 24h × ${wue.value} L/kWh (${wue.label}), converted to gallons.`,
+        methodology: `Estimated PUE ${estimatedPue} × ${mwLoad} MW IT load × 24h × ${wue.value} L/kWh (${wue.label}), converted to gallons.`,
       },
       caveats: [
         "Model estimate from published WUE reference coefficients, not a site-specific engineering study.",
+        "Uses this scenario's modeled PUE estimate (see the Efficiency section), itself a directional industry-benchmark model, not a measured figure.",
         "Actual consumption depends on climate, chiller design, and operating setpoints.",
       ],
     },

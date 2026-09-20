@@ -31,7 +31,7 @@ const SEVERITY_STYLE: Record<string, string> = {
 };
 
 export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis }) {
-  const { power, fiber, regulation, water, land, development, gaps } = analysis;
+  const { power, fiber, regulation, efficiency, water, land, development, gaps } = analysis;
 
   return (
     <div className="px-3.5 py-3">
@@ -60,6 +60,26 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
           }}
         />
         <MetricRow metric={power.likelyAction} />
+      </Section>
+
+      <Section title="Efficiency" color="#e0a84a">
+        <MetricRow
+          metric={{
+            ...efficiency.estimatedPue,
+            value: `${efficiency.estimatedPue.value.toFixed(2)} PUE`,
+          }}
+        />
+        <div className="mt-1 mb-2 space-y-1 pl-0.5">
+          {efficiency.estimatedPue.factors.map((f, i) => (
+            <div key={i} className="flex items-start justify-between gap-3 text-[11px] leading-snug">
+              <span className="text-ink-500">{f.label}</span>
+              <span className="font-mono text-ink-300 shrink-0">
+                {i === 0 ? "" : f.deltaPue >= 0 ? "+" : ""}
+                {f.deltaPue.toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section title="Water" color="#3ba9f2">

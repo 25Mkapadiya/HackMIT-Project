@@ -54,9 +54,6 @@ export const COOLING_TECH_TO_WUE_KEY: Record<string, keyof typeof WUE_L_PER_KWH>
   immersion: "immersion",
 };
 
-/** Fraction of IT load that becomes total facility (IT + mechanical/electrical) load, i.e. PUE. */
-export const ASSUMED_PUE = 1.4;
-
 export const GALLONS_PER_LITER = 0.264172;
 
 /** Acreage per MW of IT load — wide industry range; used only as a rough footprint estimate. */
@@ -105,3 +102,83 @@ export const POPULATION_DENSITY_TIERS = {
   high: 1000, // urban
   // 1000+/sq mi: dense urban
 };
+
+/**
+ * Base PUE (Power Usage Effectiveness) by cooling technology — the site's
+ * "if built well" baseline before any local siting adjustment. Sourced from
+ * published 2025-era industry figures, not measured from this app's own data:
+ *   - Uptime Institute 2025 Global Data Center Survey: industry-wide average
+ *     PUE ~1.54 (flat for the 6th straight year).
+ *   - DX (no economizer): ~1.5-1.7 (compressor cooling runs continuously,
+ *     no free-cooling path).
+ *   - Air-cooled chiller with economizer hours: ~1.38 industry-cited figure.
+ *   - Water-cooled chiller + evaporative cooling tower: ~1.29 industry-cited
+ *     figure — more efficient than air-cooled, at the cost of water use.
+ *   - Direct-to-chip liquid cooling: commonly cited as "a path to 1.1 PUE";
+ *     ~70-75% of rack heat is removed directly, the rest still needs air
+ *     handling, so a mid-1.1x figure is used rather than the 1.1 ceiling.
+ *   - Immersion cooling: ~1.05-1.10 (single-phase) to ~1.05-1.07 (two-phase).
+ * See src/lib/analysis/efficiency.ts for how this combines with the
+ * density/water-stress adjustments below into an estimated PUE.
+ */
+export const BASE_PUE_BY_COOLING_TECH: Record<string, { value: number; label: string; description: string }> = {
+  air_cooled_dx: {
+    value: 1.6,
+    label: "Air-cooled (DX, no economizer)",
+    description:
+      "Direct-expansion compressor cooling runs continuously with no free-cooling path — commonly cited near 1.5-1.7 PUE.",
+  },
+  chilled_water_air_cooled_chiller: {
+    value: 1.38,
+    label: "Chilled water, air-cooled chiller",
+    description:
+      "Air-cooled chiller plant with some economizer hours — commonly cited near 1.38 PUE, vs. ~1.29 for a water-cooled tower equivalent.",
+  },
+  cooling_tower_evaporative: {
+    value: 1.29,
+    label: "Open cooling tower (evaporative)",
+    description:
+      "Water-cooled chiller plus cooling tower — commonly cited near 1.29 PUE, more efficient than air-cooled equivalents at the cost of water use.",
+  },
+  closed_loop_liquid: {
+    value: 1.15,
+    label: "Closed-loop liquid / direct-to-chip",
+    description:
+      "Direct-to-chip cold plates remove roughly 70-75% of rack heat directly; the remainder still needs air handling. Industry sources describe this as a path toward 1.1 PUE.",
+  },
+  immersion: {
+    value: 1.08,
+    label: "Immersion cooling",
+    description:
+      "Single- and two-phase immersion cooling is commonly cited in the 1.05-1.10 PUE range, eliminating most air-handling overhead.",
+  },
+};
+
+/**
+ * Modeled PUE adjustment from local "grid demand pressure" (county population
+ * density — see PowerAnalysis.gridDemandPressure). This is NOT a measured
+ * statistical correlation: no public dataset joins per-facility PUE to county
+ * population data. It's a directional nudge reflecting a documented industry
+ * pattern instead — Uptime Institute reporting puts hyperscale, single-tenant
+ * facilities (easier to site on cheap contiguous rural/exurban land) at
+ * ~1.1-1.2 PUE, against ~1.5-1.8 for smaller/multi-tenant facilities more
+ * common where land and power headroom are scarce (i.e. dense counties).
+ */
+export const PUE_DENSITY_ADJUSTMENT: Record<"Low" | "Moderate" | "High" | "Very High" | "Unknown", number> = {
+  Low: 0,
+  Moderate: 0.03,
+  High: 0.08,
+  "Very High": 0.15,
+  Unknown: 0,
+};
+
+/**
+ * Modeled PUE penalty applied only when evaporative cooling is selected at a
+ * site that is BOTH in a high-demand-pressure county AND water-stressed —
+ * the scenario where evaporative cooling's water draw is most likely to run
+ * into permitting or supply friction and get value-engineered into an
+ * air-cooled fallback. Sized as the gap between the evaporative baseline
+ * (~1.29) and the air-cooled-chiller baseline (~1.38) above, rounded up
+ * slightly for the added friction of a forced late redesign.
+ */
+export const PUE_WATER_STRESS_CONSTRAINT_DELTA = 0.1;
