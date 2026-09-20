@@ -589,10 +589,18 @@ export default function MapView() {
       // visually bury the lines it's meant to give context to. Anything
       // added later goes on top by default, so insert it before the first
       // transmission-line layer already present, if any.
+      //
+      // Every state infrastructure layer also has to stay below the placed
+      // data center's own layers (proposed-points-*, campus-extrusion,
+      // substation-links-*), which are all added once at map init and would
+      // otherwise get buried by whichever infra layer is toggled on last.
+      // "proposed-points-glow" is the first of that group, so inserting
+      // before it keeps a placed site visually on top of every metric.
       const insertBeforeId =
         layer.id === "population-density"
-          ? map.getStyle().layers?.find((l) => l.id.endsWith("-transmission-lines-line"))?.id
-          : undefined;
+          ? map.getStyle().layers?.find((l) => l.id.endsWith("-transmission-lines-line"))?.id ??
+            "proposed-points-glow"
+          : "proposed-points-glow";
       for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
         if (!map.getLayer(spec.id)) {
           map.addLayer(spec, insertBeforeId);
