@@ -46,11 +46,21 @@ function implementedStatesBounds(): [[number, number], [number, number]] {
 // Layers fade in via a GPU-composited paint-opacity transition (no rAF loop
 // per state, no re-render, no geometry work) — cheap enough to run on every
 // live state at once without dropping frames.
-const REVEAL_SPAN_MS = 2200;
-const LAYER_FADE_MS = 550;
+const REVEAL_SPAN_MS = 2000;
+const LAYER_FADE_MS = 500;
 const RIPPLE_DURATION_MS = 1500;
 const RIPPLE_MAX_RADIUS_PX = 240;
 const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
+// Distance -> delay uses smoothstep, not ease-out. getShowAllStates()
+// includes Hawaii, so maxDistance is ~35-40° (Hawaii or Maine/Florida) — an
+// ease-out curve's steep initial slope meant even Oregon/California sat
+// through 450ms-1.3s of pure artificial delay before appearing at all, which
+// read as "nothing is happening" rather than a spread. Smoothstep has zero
+// slope at both ends: nearby states still start appearing almost immediately
+// (faster than linear would give them), the sweep visibly and continuously
+// crosses the country over the full span, and it eases to a gentle stop on
+// the last few far-flung states instead of a hard cutoff.
+const SMOOTHSTEP = (t: number) => t * t * (3 - 2 * t);
 
 /** Flat-earth approximation (with a longitude/cos(lat) correction) — plenty accurate for ordering/timing a reveal, not for real distance. */
 function approxDistanceDeg(a: readonly [number, number], b: readonly [number, number]): number {
@@ -161,6 +171,7 @@ export default function MapView() {
   const preloadedLayerDataRef = useRef<Map<string, FeatureCollection>>(new Map());
   const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const showAllAnimationRunRef = useRef(0);
+  const preloadPausedRef = useRef(false);
   const rippleRunRef = useRef(0);
   const lastShowAllAnimationKeyRef = useRef("");
   // Layer ids (e.g. "transmission-lines") are stable across states even though
@@ -237,6 +248,12 @@ export default function MapView() {
       let nextTask = 0;
       const workers = Array.from({ length: workerCount }, async () => {
         while (nextTask < tasks.length) {
+          // A Show All reveal wave is actively playing — its own timers need
+          // the main thread free of large JSON-parsing bursts from preload
+          // responses landing all at once. Yield until it's done, then resume.
+          while (preloadPausedRef.current) {
+            await new Promise((resolve) => setTimeout(resolve, 120));
+          }
           const task = tasks[nextTask++];
           if (task) await task();
         }
@@ -674,21 +691,6 @@ export default function MapView() {
         return;
       }
 
-      // Opportunistically materialize whatever the background preload already
-      // has cached, for every state, right away — no network, no waiting. This
-      // is what makes returning to a previously-shown Show All view instant.
-      for (const state of states) {
-        for (const layer of state.layers) {
-          if (layer.geometryType === "raster") continue;
-          const key = `${state.id}:${layer.id}`;
-          if (loadedLayerIds.current.has(key)) continue;
-          const cached = preloadedLayerDataRef.current.get(key);
-          if (cached) materializeLayer(state, layer, cached);
-        }
-      }
-
-      if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
-
       const animationKey = viewKey;
       const shouldAnimate = lastShowAllAnimationKeyRef.current !== animationKey;
       if (!shouldAnimate) {
@@ -716,8 +718,20 @@ export default function MapView() {
       for (const state of states) hideAllLayers(state);
       playRippleFromWashington(map, origin, rippleRunRef);
 
+      // The background preload (see the mount effect above) can have several
+      // fetch responses landing in the same window as this wave's timers —
+      // parsing those large GeoJSON payloads is real main-thread work that
+      // was measured to push even a 0ms-delay reveal back by several hundred
+      // ms. Pausing that worker pool for the duration of the wave keeps every
+      // frame of the reveal itself smooth; it resumes right after.
+      preloadPausedRef.current = true;
+      const revealTailMs = REVEAL_SPAN_MS + LAYER_FADE_MS + 250;
+      window.setTimeout(() => {
+        if (showAllAnimationRunRef.current === runId) preloadPausedRef.current = false;
+      }, revealTailMs);
+
       states.forEach((state, index) => {
-        const delay = REVEAL_SPAN_MS * EASE_OUT_CUBIC(distances[index]! / maxDistance);
+        const delay = REVEAL_SPAN_MS * SMOOTHSTEP(distances[index]! / maxDistance);
         window.setTimeout(async () => {
           if (showAllAnimationRunRef.current !== runId || lastSyncedViewKey.current !== viewKey) return;
           await ensureStateVisibleLayers(state);
