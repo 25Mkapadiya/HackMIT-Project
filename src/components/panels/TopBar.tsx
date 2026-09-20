@@ -11,6 +11,8 @@ export default function TopBar() {
   const comparisonIds = useAppStore((s) => s.comparisonIds);
   const setComparisonIds = useAppStore((s) => s.setComparisonIds);
   const setComparisonOpen = useAppStore((s) => s.setComparisonOpen);
+  const graphOpen = useAppStore((s) => s.graphOpen);
+  const setGraphOpen = useAppStore((s) => s.setGraphOpen);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const setActiveStateId = useAppStore((s) => s.setActiveStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
@@ -186,17 +188,30 @@ export default function TopBar() {
         </div>
       </div>
 
-      <button
-        onClick={() => setProposeMode(!proposeMode)}
-        disabled={!showAllStates && !activeState?.enabled}
-        className={`justify-self-center text-[14px] font-semibold px-6 py-2.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-          proposeMode
-            ? "bg-accent-proposed text-white shadow-[0_0_0_3px_rgba(255,84,112,0.25)]"
-            : "bg-ink-100 text-base-950 hover:brightness-95"
-        }`}
-      >
-        {proposeMode ? "Click the map to place site…" : "+ Propose Data Center"}
-      </button>
+      <div className="justify-self-center flex items-center gap-2">
+        <button
+          onClick={() => setProposeMode(!proposeMode)}
+          disabled={!showAllStates && !activeState?.enabled}
+          className={`text-[14px] font-semibold px-6 py-2.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+            proposeMode
+              ? "bg-accent-proposed text-white shadow-[0_0_0_3px_rgba(255,84,112,0.25)]"
+              : "bg-ink-100 text-base-950 hover:brightness-95"
+          }`}
+        >
+          {proposeMode ? "Click the map to place site…" : "+ Propose Data Center"}
+        </button>
+        <button
+          onClick={() => setGraphOpen(!graphOpen)}
+          className={`text-[14px] font-semibold px-4 py-2.5 rounded-md border transition-all ${
+            graphOpen
+              ? "border-accent-power/60 bg-accent-power/15 text-accent-power"
+              : "border-base-600 text-ink-200 hover:bg-base-800 hover:text-ink-100"
+          }`}
+          title="Graph one EU data-centre variable against another"
+        >
+          Graph Data
+        </button>
+      </div>
 
       <div className="flex items-center justify-end gap-2 shrink-0">
         <button

@@ -46,6 +46,10 @@ interface AppState {
   setComparisonIds: (ids: string[]) => void;
   comparisonOpen: boolean;
   setComparisonOpen: (v: boolean) => void;
+
+  // EU data-centre graph window
+  graphOpen: boolean;
+  setGraphOpen: (v: boolean) => void;
 }
 
 let scenarioCounter = 0;
@@ -181,4 +185,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setComparisonIds: (ids) => set({ comparisonIds: ids }),
   comparisonOpen: false,
   setComparisonOpen: (v) => set({ comparisonOpen: v }),
+  graphOpen: false,
+  setGraphOpen: (v) => set({ graphOpen: v }),
 }));

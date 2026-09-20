@@ -7,6 +7,7 @@ import LayerControlPanel from "@/components/panels/LayerControlPanel";
 import ScenarioPanel from "@/components/panels/ScenarioPanel";
 import Legend from "@/components/panels/Legend";
 import ComparisonPanel from "@/components/panels/ComparisonPanel";
+import GraphPanel from "@/components/panels/GraphPanel";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -29,6 +30,7 @@ export default function Home() {
       <ScenarioPanel collapsed={scenarioCollapsed} onToggleCollapse={() => setScenarioCollapsed((c) => !c)} />
       <Legend />
       <ComparisonPanel />
+      <GraphPanel />
     </main>
   );
 }

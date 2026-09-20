@@ -12,6 +12,7 @@ interface DraggablePanelProps {
   children: ReactNode;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  onClose?: () => void;
   headerAccent?: string;
   className?: string;
   /** Set false to pin the panel at defaultPosition and disable header drag entirely. */
@@ -32,6 +33,7 @@ export default function DraggablePanel({
   children,
   collapsed,
   onToggleCollapse,
+  onClose,
   headerAccent = "#8fa3bf",
   className = "",
   draggable = true,
@@ -98,7 +100,17 @@ export default function DraggablePanel({
             {title}
           </span>
         </div>
-        {onToggleCollapse && (
+        {onClose && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onClose}
+            aria-label="Close"
+            className="text-ink-500 hover:text-ink-100 transition-colors text-sm leading-none px-1.5 py-0.5 rounded hover:bg-base-800"
+          >
+            ✕
+          </button>
+        )}
+        {!onClose && onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expand panel" : "Collapse panel"}
