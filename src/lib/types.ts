@@ -163,6 +163,27 @@ export interface WaterAnalysis {
   droughtStatus: Metric<string>;
   waterStressLabel: Metric<"Low" | "Medium" | "High" | "Unknown">;
   wueAssumption: Metric<number>;
+  /**
+   * Multiplier applied to the evaporative water-use estimate above from local
+   * climate (see ClimateAnalysis / src/lib/analysis/climate.ts) — 1.0 at the
+   * national-reference cooling-degree-day baseline, higher in hotter/more
+   * cooling-intensive climates, lower in cooler ones. Directional heuristic,
+   * not a measured per-facility correlation.
+   */
+  climateWaterAdjustment: Metric<number>;
+}
+
+/**
+ * Live point-queried site temperature/cooling-load context (Open-Meteo ERA5
+ * reanalysis — see NATIONAL_SOURCES.openMeteoArchive and
+ * src/lib/analysis/climate.ts), used to scale the evaporative-cooling water
+ * estimate in WaterAnalysis.climateWaterAdjustment for the specific site's
+ * climate rather than one flat nationwide assumption.
+ */
+export interface ClimateAnalysis {
+  annualAvgTempF: Metric<number | null>;
+  /** Base-65°F cooling degree days, summed over the lookback period and annualized. */
+  coolingDegreeDays65: Metric<number | null>;
 }
 
 export interface PueFactor {
@@ -246,6 +267,7 @@ export interface ScenarioAnalysis {
   regulation: RegulationAnalysis;
   efficiency: EfficiencyAnalysis;
   water: WaterAnalysis;
+  climate: ClimateAnalysis;
   land: LandAnalysis;
   noise: NoiseAnalysis;
   development: DevelopmentEstimate;

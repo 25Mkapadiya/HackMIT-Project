@@ -283,3 +283,40 @@ export const PUE_GRID_PROXIMITY_ADJUSTMENT: Record<"Very Close" | "Close" | "Mod
 
 /** Square feet in one acre. */
 export const SQ_FT_PER_ACRE = 43560;
+
+/**
+ * Number of most-recent complete calendar years averaged for the site
+ * temperature/cooling-degree-day lookup (src/lib/analysis/climate.ts) —
+ * smooths a single anomalous year while staying a quick live point query
+ * (no 30-year "climate normal" dataset build required).
+ */
+export const CLIMATE_LOOKBACK_YEARS = 3;
+
+/** Base temperature (°F) for cooling degree day calculations — the standard US convention. */
+export const COOLING_DEGREE_DAY_BASE_F = 65;
+
+/**
+ * Reference annual base-65°F cooling degree days used as the "typical US
+ * site" baseline for the climate-driven water-use adjustment below. NOAA
+ * NCEI reports the contiguous-US 1991-2020 annual-average CDD65 at roughly
+ * 1250-1300; 1275 is used as a round, documented midpoint — this is a
+ * national reference point for a directional adjustment, not a claim about
+ * any specific county's normal.
+ */
+export const CDD65_US_REFERENCE = 1275;
+
+/**
+ * How strongly a site's cooling-degree-day burden (relative to the national
+ * reference above) scales the evaporative-cooling water-use estimate. A site
+ * at exactly the national-reference CDD65 gets no adjustment (multiplier 1);
+ * a site with double the reference CDD65 gets roughly +50% modeled water use
+ * (0.5 sensitivity), and a site with zero CDD65 gets roughly -50%. This is a
+ * transparent heuristic reflecting the documented pattern that hotter/more
+ * cooling-intensive climates run cooling towers harder and rely on
+ * evaporative rejection more of the year — NOT a measured per-facility
+ * statistical correlation between local temperature and WUE.
+ */
+export const CLIMATE_WUE_SENSITIVITY = 0.5;
+
+/** Clamp bounds for the climate water-use multiplier above, so a data gap or an extreme outlier site can't blow up the estimate. */
+export const CLIMATE_WUE_MULTIPLIER_BOUNDS: [number, number] = [0.6, 1.75];

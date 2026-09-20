@@ -240,4 +240,19 @@ export const NATIONAL_SOURCES = {
     methodology:
       "Nationwide substation point locations queried by bounding box across all 8 voltage-tier sub-layers of the source service and merged; voltage range from the source's MAX_VOLT/MIN_VOLT attributes. Location only — not a statement of interconnection headroom or available capacity at that substation.",
   },
+  /**
+   * Open-Meteo's Historical Weather (Archive) API — free, no API key, backed
+   * by ECMWF ERA5 reanalysis (~9-25km grid). Point-queried directly at the
+   * scenario's lat/lng, so it works anywhere in the US at full spatial
+   * resolution rather than being bucketed to a county/state average.
+   */
+  openMeteoArchive: {
+    id: "open-meteo-archive",
+    name: "Open-Meteo Historical Weather API (ECMWF ERA5 reanalysis)",
+    url: "https://archive-api.open-meteo.com/v1/archive",
+    license: "Open-Meteo (CC BY 4.0), derived from ECMWF ERA5",
+    refreshFrequency: "Live point query per scenario location, cached 1 day",
+    methodology:
+      "Daily mean 2m air temperature (ERA5 reanalysis) for the most recent 3 complete calendar years, point-queried at the exact site coordinates and averaged into an annual mean temperature and base-65°F cooling degree days. Reanalysis, not a station observation — accurate to the underlying ~9-25km grid cell, not the exact parcel.",
+  },
 } satisfies Record<string, SourceMeta>;

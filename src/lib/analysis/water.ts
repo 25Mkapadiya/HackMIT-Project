@@ -3,7 +3,8 @@ import type { ScenarioConfig, WaterAnalysis } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, featuresWithinRadius, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
-import { CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION, CLOSED_LOOP_GALLONS_PER_TON, CLOSED_LOOP_REFRESH_INTERVAL_YEARS, COOLING_TOWER_CYCLES_OF_CONCENTRATION, COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC, EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH, GALLONS_PER_LITER, KW_PER_REFRIGERATION_TON } from "@/lib/constants/assumptions";
+import { CDD65_US_REFERENCE, CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION, CLOSED_LOOP_GALLONS_PER_TON, CLOSED_LOOP_REFRESH_INTERVAL_YEARS, COOLING_TOWER_CYCLES_OF_CONCENTRATION, COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC, EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH, GALLONS_PER_LITER, KW_PER_REFRIGERATION_TON } from "@/lib/constants/assumptions";
+import { computeClimateWaterMultiplier } from "./climate";
 
 /** D0 (abnormally dry) through D4 (exceptional drought) — US Drought Monitor classification labels. */
 const USDM_LABELS = [
@@ -78,13 +79,14 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   const rightsBbox = bboxAroundMiles(lng, lat, 10);
   const droughtBbox = bboxAroundMiles(lng, lat, 20);
 
-  const [riversFc, waterbodiesFc, rightsFc, droughtFc] = await Promise.all([
+  const [riversFc, waterbodiesFc, rightsFc, droughtFc, climateAdjustment] = await Promise.all([
     getFetcher(stateId, "hydrography-rivers")(waterBbox) as Promise<FeatureCollection<Geometry, { GNIS_Name?: string }>>,
     getFetcher(stateId, "hydrography-waterbodies")(waterBbox) as Promise<
       FeatureCollection<Geometry, { GNIS_Name?: string }>
     >,
     getFetcher(stateId, "water-diversions")(rightsBbox) as Promise<FeatureCollection<Geometry, Record<string, unknown>>>,
     getFetcher(stateId, "drought-areas")(droughtBbox) as Promise<FeatureCollection<Geometry, { DM?: number }>>,
+    computeClimateWaterMultiplier(scenario),
   ]);
 
   const combinedWater: FeatureCollection<Geometry, { GNIS_Name?: string }> = {
@@ -119,15 +121,21 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   // Annual-average evaporative operating estimate uses an empirical US
   // operator benchmark rather than assuming the cooling tower is at full
   // mechanical load 24/7/365. Microsoft reports FY25 Americas WUE = 0.34 L/kWh.
+  // That benchmark is itself a blended average across Microsoft's Americas
+  // fleet's climates, so it's scaled by this site's own cooling-degree-day
+  // burden relative to the national reference (see climate.ts) rather than
+  // applied as one flat nationwide number.
   const itEnergyKwhPerDay = itLoadKw * 24;
   const evaporativeConsumptionGalPerDay =
     itEnergyKwhPerDay *
     EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary *
-    GALLONS_PER_LITER;
+    GALLONS_PER_LITER *
+    climateAdjustment.multiplier;
 
-  // Keep the DOE tower calculation as a transparent peak/design upper bound.
+  // Keep the DOE tower calculation as a transparent peak/design upper bound,
+  // scaled by the same climate multiplier.
   const evaporativePeakMakeupGalPerDay =
-    refrigerationTons * COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC;
+    refrigerationTons * COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC * climateAdjustment.multiplier;
   const evaporativePeakBlowdownGalPerDay =
     evaporativePeakMakeupGalPerDay / COOLING_TOWER_CYCLES_OF_CONCENTRATION;
 
@@ -167,7 +175,7 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
         name: "Empirical US data-center WUE benchmark",
         url: "https://datacenters.microsoft.com/sustainability/efficiency/",
         methodology:
-          `Primary operating estimate uses Microsoft FY25 Americas WUE ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary} L/kWh applied to IT energy. Observed operator context: Meta 2024 ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.low} L/kWh and Google 2024 ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.high} L/kWh. DOE full-load cooling-tower math is retained only as a peak/design upper bound (~${Math.round(evaporativePeakMakeupGalPerDay).toLocaleString()} gal/day makeup at this load).`,
+          `Primary operating estimate uses Microsoft FY25 Americas WUE ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary} L/kWh applied to IT energy, scaled by a ${climateAdjustment.multiplier}x local-climate adjustment (this site's cooling-degree-day burden vs. the national reference — see climateWaterAdjustment). Observed operator context: Meta 2024 ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.low} L/kWh and Google 2024 ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.high} L/kWh. DOE full-load cooling-tower math is retained only as a peak/design upper bound (~${Math.round(evaporativePeakMakeupGalPerDay).toLocaleString()} gal/day makeup at this load).`,
       }
     : isClosedChilledWater
       ? {
@@ -196,6 +204,9 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
         ? [
             `Displayed value is an annual-average operating benchmark using Microsoft FY25 Americas WUE (${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary} L/kWh), not a full-load cooling-tower maximum.`,
             `Observed operator WUE spans roughly ${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.low}-${EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.high} L/kWh across Meta, Microsoft, and Google; actual site use varies substantially by climate, utilization, economizer hours, and cooling design.`,
+            climateAdjustment.annualAvgTempF != null
+              ? `Local climate adjustment applied: ${climateAdjustment.multiplier}x, from a ${climateAdjustment.annualAvgTempF}°F site average temperature (${climateAdjustment.coolingDegreeDays65} CDD65/yr) — see climateWaterAdjustment.`
+              : "Local climate data was unavailable for this site — no climate adjustment was applied (1.0x).",
           ]
         : isClosedChilledWater
           ? [
@@ -262,6 +273,20 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
       unit: isEvaporative ? "L/kWh WUE" : isClosedChilledWater ? "% makeup/yr" : "gal/day routine",
       confidence: "estimated",
       source: waterModelSource,
+    },
+    climateWaterAdjustment: {
+      label: "Local climate water-use adjustment",
+      value: climateAdjustment.multiplier,
+      unit: "× baseline",
+      confidence: climateAdjustment.annualAvgTempF != null ? "estimated" : "unknown",
+      source: NATIONAL_SOURCES.openMeteoArchive,
+      caveats:
+        climateAdjustment.annualAvgTempF != null
+          ? [
+              `Based on a ${climateAdjustment.annualAvgTempF}°F average site temperature and ${climateAdjustment.coolingDegreeDays65} cooling degree days (base 65°F) per year vs. a ~${CDD65_US_REFERENCE} CDD65/yr national reference.`,
+              "Directional heuristic — hotter/more cooling-intensive climates run evaporative cooling harder; not a measured per-facility correlation. Only applied to the evaporative cooling-tower model above.",
+            ]
+          : ["Could not reach the climate data source for this location — no adjustment applied (1.0x)."],
     },
   };
 }

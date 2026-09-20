@@ -46,7 +46,7 @@ const SEVERITY_LABEL_STYLE: Record<string, string> = {
 };
 
 export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis }) {
-  const { power, fiber, regulation, efficiency, water, land, noise, development, gaps } = analysis;
+  const { power, fiber, regulation, efficiency, water, climate, land, noise, development, gaps } = analysis;
 
   return (
     <div className="px-3.5 py-3">
@@ -101,6 +101,14 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
         <MetricRow metric={water.droughtStatus} />
         <MetricRow metric={water.waterStressLabel} />
         <MetricRow metric={water.wueAssumption} />
+        <MetricRow metric={climate.annualAvgTempF} />
+        <MetricRow metric={climate.coolingDegreeDays65} />
+        <MetricRow
+          metric={{
+            ...water.climateWaterAdjustment,
+            value: `${water.climateWaterAdjustment.value.toFixed(2)}x`,
+          }}
+        />
       </Section>
 
       <Section title="Fiber / Connectivity" color="#9b6ef2">
