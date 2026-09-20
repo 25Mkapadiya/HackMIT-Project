@@ -110,9 +110,15 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   const refrigerationTons = itLoadKw / KW_PER_REFRIGERATION_TON;
 
   // Closed chilled-water loop: annualize conservative makeup + periodic service refill.
+  // Only the routine makeup (seal/fitting losses, plus the light adiabatic
+  // pre-cooling assist many air-cooled chiller plants run on hot days to keep
+  // the condenser coil's entering air within the compressor's rated range —
+  // see the "optional adiabatic assist" caveat below) scales with local
+  // climate; the scheduled full-loop refresh is a fixed maintenance interval,
+  // not a climate-driven draw, so it's left unscaled.
   const closedLoopVolumeGal = refrigerationTons * CLOSED_LOOP_GALLONS_PER_TON;
   const closedLoopRoutineMakeupGalPerYear =
-    closedLoopVolumeGal * CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION;
+    closedLoopVolumeGal * CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * climateAdjustment.multiplier;
   const closedLoopRefreshGalPerYear =
     closedLoopVolumeGal / CLOSED_LOOP_REFRESH_INTERVAL_YEARS;
   const closedLoopAnnualizedGalPerDay =
@@ -183,7 +189,7 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
           name: "ASHRAE closed hydronic loop guidance",
           url: "https://handbook.ashrae.org/Handbooks/A23/SI/A23_Ch50/a23_ch50_si.aspx",
           methodology:
-            "ASHRAE describes closed hydronic loops as typically requiring less than 5% makeup/year; the model uses 5%/year plus one full-loop refresh every 3 years, annualized.",
+            `ASHRAE describes closed hydronic loops as typically requiring less than 5% makeup/year; the model uses 5%/year (scaled ${climateAdjustment.multiplier}x for this site's local climate — see climateWaterAdjustment) plus one full-loop refresh every 3 years, annualized.`,
         }
       : {
           id: "ashrae-dry-cooling",
@@ -211,10 +217,14 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
         : isClosedChilledWater
           ? [
               `Estimated loop inventory: ~${Math.round(closedLoopVolumeGal).toLocaleString()} gal at ${CLOSED_LOOP_GALLONS_PER_TON} gal/ton.`,
-              `Annualized average includes ${Math.round(CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100)}% routine makeup/year plus one full-loop refresh every ${CLOSED_LOOP_REFRESH_INTERVAL_YEARS} years; actual additions occur intermittently.`,
+              `Annualized average includes ${Math.round(CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100)}% routine makeup/year (scaled ${climateAdjustment.multiplier}x for local climate — hotter sites run harder and lean more on optional adiabatic pre-cooling assist) plus one full-loop refresh every ${CLOSED_LOOP_REFRESH_INTERVAL_YEARS} years, which is a fixed maintenance interval and is not climate-scaled; actual additions occur intermittently.`,
+              climateAdjustment.annualAvgTempF != null
+                ? `Local climate adjustment applied: ${climateAdjustment.multiplier}x, from a ${climateAdjustment.annualAvgTempF}°F site average temperature (${climateAdjustment.coolingDegreeDays65} CDD65/yr) — see climateWaterAdjustment.`
+                : "Local climate data was unavailable for this site — no climate adjustment was applied (1.0x).",
             ]
           : [
               "ASHRAE describes dry closed-loop heat rejection as virtually zero-water for cooling. This excludes domestic water, humidification, fire systems, commissioning fills, leaks, and optional adiabatic assist.",
+              "Dry heat rejection draws no cooling-process water regardless of climate, so no climate adjustment applies here.",
             ],
     },
     estimatedWithdrawalGalPerDay: {
@@ -266,9 +276,9 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
     wueAssumption: {
       label: `Water model — ${waterModelLabel}`,
       value: isEvaporative
-        ? EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary
+        ? Math.round(EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary * climateAdjustment.multiplier * 100) / 100
         : isClosedChilledWater
-          ? CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100
+          ? Math.round(CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * 100 * climateAdjustment.multiplier * 100) / 100
           : 0,
       unit: isEvaporative ? "L/kWh WUE" : isClosedChilledWater ? "% makeup/yr" : "gal/day routine",
       confidence: "estimated",
@@ -284,7 +294,7 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
         climateAdjustment.annualAvgTempF != null
           ? [
               `Based on a ${climateAdjustment.annualAvgTempF}°F average site temperature and ${climateAdjustment.coolingDegreeDays65} cooling degree days (base 65°F) per year vs. a ~${CDD65_US_REFERENCE} CDD65/yr national reference.`,
-              "Directional heuristic — hotter/more cooling-intensive climates run evaporative cooling harder; not a measured per-facility correlation. Only applied to the evaporative cooling-tower model above.",
+              "Directional heuristic — hotter/more cooling-intensive climates run evaporative cooling tower and closed-loop chiller makeup harder; not a measured per-facility correlation. Applied to the evaporative-consumption and closed chilled-water routine-makeup estimates above; dry heat-rejection technologies (air-cooled DX, direct-to-chip, immersion) draw no cooling-process water regardless of climate, so they're unaffected.",
             ]
           : ["Could not reach the climate data source for this location — no adjustment applied (1.0x)."],
     },
