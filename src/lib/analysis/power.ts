@@ -73,13 +73,13 @@ async function nearestWithExpandingSearch<P>(
   fetcher: (bbox: Bbox) => Promise<FeatureCollection<Geometry, P>>
 ) {
   for (let i = 0; i < NEAREST_GRID_SEARCH_RADII_MI.length; i += 1) {
-    const radius = NEAREST_GRID_SEARCH_RADII_MI[i];
+    const radius = NEAREST_GRID_SEARCH_RADII_MI[i]!;
     const fc = await fetcher(bboxAroundMiles(lng, lat, radius));
     const nearest = nearestFeature(lng, lat, fc);
     if (!nearest.feature) continue;
 
     const nextRadius =
-      NEAREST_GRID_SEARCH_RADII_MI[Math.min(i + 1, NEAREST_GRID_SEARCH_RADII_MI.length - 1)];
+      NEAREST_GRID_SEARCH_RADII_MI[Math.min(i + 1, NEAREST_GRID_SEARCH_RADII_MI.length - 1)]!;
     if (nextRadius === radius) return nearest;
 
     const wider = await fetcher(bboxAroundMiles(lng, lat, nextRadius));

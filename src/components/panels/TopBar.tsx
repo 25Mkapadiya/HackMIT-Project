@@ -27,7 +27,7 @@ export default function TopBar() {
   const activeState = getState(activeStateId);
   const implementedStates = getShowAllStates();
   const subtitle = showAllStates
-    ? `Showing all ${implementedStates.length} implemented states`
+    ? ""
     : activeState?.enabled
       ? ""
       : `${activeState?.name ?? "Selected state"} — coming soon, showing Washington's live analysis`;
