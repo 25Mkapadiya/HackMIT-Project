@@ -71,6 +71,31 @@ export const GALLONS_PER_LITER = 0.264172;
  */
 export const COOLING_TOWER_CYCLES_OF_CONCENTRATION = 4;
 
+/**
+ * Closed chilled-water loop planning assumptions.
+ * Carrier documents a 6 gal/ton example loop; Johnson Controls recommends
+ * 8-10 gal/ton for one air-cooled chiller family. We use 8 gal/ton as a
+ * transparent midpoint planning value, not a universal design requirement.
+ */
+export const CLOSED_LOOP_GALLONS_PER_TON = 8;
+
+/**
+ * ASHRAE describes closed hydronic loops as systems typically requiring
+ * less than 5% makeup per year. Using 5% is therefore a conservative
+ * upper-bound planning assumption for leakage / routine makeup.
+ */
+export const CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION = 0.05;
+
+/**
+ * Maintenance refresh interval used to annualize periodic loop refill.
+ * Three years is a planning assumption, not a universal ASHRAE requirement;
+ * manufacturer service intervals vary by fluid chemistry and equipment.
+ */
+export const CLOSED_LOOP_REFRESH_INTERVAL_YEARS = 3;
+
+/** One refrigeration ton equals approximately 3.517 kW of heat removal. */
+export const KW_PER_REFRIGERATION_TON = 3.517;
+
 /** Acreage per MW of IT load — wide industry range; used only as a rough footprint estimate. */
 export const ACREAGE_PER_MW = {
   low: 0.4,
