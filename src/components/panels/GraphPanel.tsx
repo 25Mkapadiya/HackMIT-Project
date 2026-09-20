@@ -76,6 +76,7 @@ export default function GraphPanel() {
   const [yKey, setYKey] = useState("edc");
   const scenarios = useAppStore((s) => s.scenarios);
   const analysisByScenario = useAppStore((s) => s.analysisByScenario);
+  const [collapsed, setCollapsed] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
 
   const xVar = EU_VARIABLES.find((v) => v.key === xKey)!;
@@ -140,6 +141,8 @@ export default function GraphPanel() {
       defaultPosition={{ x: 340, y: 76 }}
       width={460}
       headerAccent="#f2b93b"
+      collapsed={collapsed}
+      onToggleCollapse={() => setCollapsed((c) => !c)}
       onClose={() => setOpen(false)}
       className="!z-40"
     >

@@ -100,37 +100,41 @@ export default function DraggablePanel({
             {title}
           </span>
         </div>
-        {onClose && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={onClose}
-            aria-label="Close"
-            className="text-ink-500 hover:text-ink-100 transition-colors text-sm leading-none px-1.5 py-0.5 rounded hover:bg-base-800"
-          >
-            ✕
-          </button>
-        )}
-        {!onClose && onToggleCollapse && (
-          <button
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? "Expand panel" : "Collapse panel"}
-            aria-expanded={!collapsed}
-            className="shrink-0 text-ink-300 hover:text-ink-100 transition-colors p-1 rounded hover:bg-base-800"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <div className="flex items-center gap-0.5 shrink-0">
+          {onToggleCollapse && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? "Expand panel" : "Collapse panel"}
+              aria-expanded={!collapsed}
+              className="shrink-0 text-ink-300 hover:text-ink-100 transition-colors p-1 rounded hover:bg-base-800"
             >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-        )}
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          )}
+          {onClose && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={onClose}
+              aria-label="Close"
+              title="Close"
+              className="text-ink-500 hover:text-ink-100 transition-colors text-sm leading-none px-1.5 py-0.5 rounded hover:bg-base-800"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
       {!collapsed && <div className="max-h-[70vh] overflow-y-auto no-scrollbar">{children}</div>}
     </div>
