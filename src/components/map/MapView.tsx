@@ -40,6 +40,114 @@ function implementedStatesBounds(): [[number, number], [number, number]] {
   ];
 }
 
+// ---- Show All "spreading out from Washington" reveal ----
+// The whole timeline is bounded (REVEAL_SPAN_MS) no matter how many states are
+// live, so adding states never makes the animation feel slower or jankier.
+// Layers fade in via a GPU-composited paint-opacity transition (no rAF loop
+// per state, no re-render, no geometry work) — cheap enough to run on every
+// live state at once without dropping frames.
+const REVEAL_SPAN_MS = 2200;
+const LAYER_FADE_MS = 550;
+const RIPPLE_DURATION_MS = 1500;
+const RIPPLE_MAX_RADIUS_PX = 240;
+const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
+
+/** Flat-earth approximation (with a longitude/cos(lat) correction) — plenty accurate for ordering/timing a reveal, not for real distance. */
+function approxDistanceDeg(a: readonly [number, number], b: readonly [number, number]): number {
+  const midLatRad = (((a[1] + b[1]) / 2) * Math.PI) / 180;
+  const dx = (a[0] - b[0]) * Math.cos(midLatRad);
+  const dy = a[1] - b[1];
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function opacityPaintProp(specType: string): string | null {
+  switch (specType) {
+    case "line":
+      return "line-opacity";
+    case "fill":
+      return "fill-opacity";
+    case "circle":
+      return "circle-opacity";
+    default:
+      return null;
+  }
+}
+
+/** Fades a layer's opacity from 0 up to its designed value over LAYER_FADE_MS. Purely GPU paint-property work. */
+function fadeInLayer(map: maplibregl.Map, layerId: string, opacityProp: string, targetOpacity: number) {
+  if (!map.getLayer(layerId)) return;
+  map.setPaintProperty(layerId, opacityProp, 0);
+  // Split into two ticks so the browser commits opacity:0 before the transition
+  // is armed — setting both in the same tick can make MapLibre skip the tween.
+  requestAnimationFrame(() => {
+    if (!map.getLayer(layerId)) return;
+    map.setPaintProperty(layerId, `${opacityProp}-transition`, { duration: LAYER_FADE_MS });
+    map.setPaintProperty(layerId, opacityProp, targetOpacity);
+  });
+}
+
+/** Shows (or hides) every layer for one state. "fade" is used only for the initial Show All reveal wave. */
+function applyStateLayerVisibility(
+  map: maplibregl.Map,
+  state: { id: string; layers: LayerDefinition[] },
+  layerVisibility: Record<string, boolean>,
+  mode: "instant" | "fade"
+) {
+  for (const layer of state.layers) {
+    if (layer.geometryType === "raster") continue;
+    const sourceId = `src-${state.id}-${layer.id}`;
+    const shouldShow = Boolean(layerVisibility[layer.id]);
+    for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+      if (!map.getLayer(spec.id)) continue;
+      if (!shouldShow) {
+        map.setLayoutProperty(spec.id, "visibility", "none");
+        continue;
+      }
+      map.setLayoutProperty(spec.id, "visibility", "visible");
+      const prop = opacityPaintProp(spec.type);
+      if (!prop) continue;
+      const targetOpacity = (spec.paint as Record<string, unknown> | undefined)?.[prop];
+      const target = typeof targetOpacity === "number" ? targetOpacity : 1;
+      if (mode === "instant") {
+        map.setPaintProperty(spec.id, prop, target);
+      } else {
+        fadeInLayer(map, spec.id, prop, target);
+      }
+    }
+  }
+}
+
+/** One decorative ring that expands outward from Washington and fades as it grows — the visual cue that infrastructure is "spreading out" as Show All reveals states radially. */
+function playRippleFromWashington(map: maplibregl.Map, origin: [number, number], runRef: { current: number }) {
+  const source = map.getSource("showall-ripple") as maplibregl.GeoJSONSource | undefined;
+  if (!source) return;
+  const runId = ++runRef.current;
+
+  source.setData({
+    type: "FeatureCollection",
+    features: [{ type: "Feature", geometry: { type: "Point", coordinates: origin }, properties: {} }],
+  });
+  if (map.getLayer("showall-ripple-ring")) {
+    map.setLayoutProperty("showall-ripple-ring", "visibility", "visible");
+  }
+
+  const start = performance.now();
+  function frame(now: number) {
+    if (runRef.current !== runId || !map.getLayer("showall-ripple-ring")) return;
+    const t = Math.min(1, (now - start) / RIPPLE_DURATION_MS);
+    const eased = EASE_OUT_CUBIC(t);
+    map.setPaintProperty("showall-ripple-ring", "circle-radius", eased * RIPPLE_MAX_RADIUS_PX);
+    map.setPaintProperty("showall-ripple-ring", "circle-stroke-opacity", (1 - eased) * 0.85);
+    map.setPaintProperty("showall-ripple-ring", "circle-opacity", (1 - eased) * 0.12);
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      map.setLayoutProperty("showall-ripple-ring", "visibility", "none");
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hawaiiContainerRef = useRef<HTMLDivElement | null>(null);
@@ -50,6 +158,7 @@ export default function MapView() {
   const preloadedLayerDataRef = useRef<Map<string, FeatureCollection>>(new Map());
   const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const showAllAnimationRunRef = useRef(0);
+  const rippleRunRef = useRef(0);
   const lastShowAllAnimationKeyRef = useRef("");
   // Layer ids (e.g. "transmission-lines") are stable across states even though
   // the underlying source is swapped out on state switch (see the teardown
@@ -226,6 +335,24 @@ export default function MapView() {
           "fill-extrusion-height": ["coalesce", ["get", "heightM"], 15],
           "fill-extrusion-base": 0,
           "fill-extrusion-opacity": 0.88,
+        },
+      });
+
+      // Decorative "spreading out" ring for the Show All reveal — see playRippleFromWashington.
+      map.addSource("showall-ripple", { type: "geojson", data: emptyFeatureCollection() });
+      map.addLayer({
+        id: "showall-ripple-ring",
+        type: "circle",
+        source: "showall-ripple",
+        layout: { visibility: "none" },
+        paint: {
+          "circle-radius": 0,
+          "circle-color": "#63d4ff",
+          "circle-opacity": 0,
+          "circle-stroke-color": "#63d4ff",
+          "circle-stroke-width": 2.5,
+          "circle-stroke-opacity": 0,
+          "circle-pitch-alignment": "map",
         },
       });
 
@@ -449,6 +576,8 @@ export default function MapView() {
             if (!map.getLayer(spec.id)) {
               map.addLayer(spec);
               map.setLayoutProperty(spec.id, "visibility", "none");
+              const prop = opacityPaintProp(spec.type);
+              if (prop) map.setPaintProperty(spec.id, prop, 0);
             }
           }
 
@@ -491,6 +620,8 @@ export default function MapView() {
               for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
                 if (!map.getLayer(spec.id)) map.addLayer(spec);
                 map.setLayoutProperty(spec.id, "visibility", "none");
+                const prop = opacityPaintProp(spec.type);
+                if (prop) map.setPaintProperty(spec.id, prop, 0);
               }
 
               const interactionKey = `${state.id}:${layer.id}`;
@@ -525,55 +656,52 @@ export default function MapView() {
 
       if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
 
-      const setStateVisibility = (state: (typeof states)[number], visible: boolean) => {
-        for (const layer of state.layers) {
-          if (layer.geometryType === "raster") continue;
-          const sourceId = `src-${state.id}-${layer.id}`;
-          for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
-            if (map.getLayer(spec.id)) {
-              const shouldShow = visible && Boolean(layerVisibility[layer.id]);
-              map.setLayoutProperty(spec.id, "visibility", shouldShow ? "visible" : "none");
-            }
-          }
-        }
-      };
-
       if (!showAllStates) {
         showAllAnimationRunRef.current += 1;
         lastShowAllAnimationKeyRef.current = "";
-        setStateVisibility(states[0]!, true);
+        applyStateLayerVisibility(map, states[0]!, layerVisibility, "instant");
         return;
       }
 
       const animationKey = viewKey;
       const shouldAnimate = lastShowAllAnimationKeyRef.current !== animationKey;
       if (!shouldAnimate) {
-        for (const state of states) setStateVisibility(state, true);
+        for (const state of states) applyStateLayerVisibility(map, state, layerVisibility, "instant");
         return;
       }
 
       lastShowAllAnimationKeyRef.current = animationKey;
       const runId = ++showAllAnimationRunRef.current;
 
-      // Order by a northwest -> southeast diagonal score using state centers.
-      const orderedStates = [...states].sort((a, b) => {
-        const scoreA = (a.center[0] + 180) + (90 - a.center[1]) * 1.35;
-        const scoreB = (b.center[0] + 180) + (90 - b.center[1]) * 1.35;
-        return scoreA - scoreB;
-      });
+      // Radial reveal, timed by real distance from Washington so it reads as
+      // infrastructure physically spreading outward — nearby states (Oregon,
+      // Idaho...) light up almost together, distant ones (Florida, Arizona...)
+      // trail behind. The whole wave is bounded to REVEAL_SPAN_MS regardless of
+      // how many states are live, so it never feels slower as coverage grows.
+      const origin = WASHINGTON.center as [number, number];
+      const distances = states.map((state) => approxDistanceDeg(origin, state.center as [number, number]));
+      const maxDistance = Math.max(...distances, 0.0001);
 
-      for (const state of states) setStateVisibility(state, false);
+      for (const state of states) {
+        for (const layer of state.layers) {
+          if (layer.geometryType === "raster") continue;
+          const sourceId = `src-${state.id}-${layer.id}`;
+          for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+            if (map.getLayer(spec.id)) map.setLayoutProperty(spec.id, "visibility", "none");
+          }
+        }
+      }
 
-      orderedStates.forEach((state, index) => {
+      playRippleFromWashington(map, origin, rippleRunRef);
+
+      states.forEach((state, index) => {
+        const delay = REVEAL_SPAN_MS * EASE_OUT_CUBIC(distances[index]! / maxDistance);
         window.setTimeout(() => {
-          if (
-            showAllAnimationRunRef.current !== runId ||
-            lastSyncedViewKey.current !== viewKey
-          ) {
+          if (showAllAnimationRunRef.current !== runId || lastSyncedViewKey.current !== viewKey) {
             return;
           }
-          setStateVisibility(state, true);
-        }, index * 125);
+          applyStateLayerVisibility(map, state, layerVisibility, "fade");
+        }, delay);
       });
     }
 

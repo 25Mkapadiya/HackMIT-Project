@@ -20,7 +20,7 @@ function LegendSwatch({ color, kind, lineWidth }: { color: string; kind?: "line"
 export default function Legend() {
   const layerVisibility = useAppStore((s) => s.layerVisibility);
   const activeStateId = useAppStore((s) => s.activeStateId);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const activeLayers = getState(activeStateId)?.layers ?? getState(DEFAULT_STATE_ID)!.layers;
   const visibleLayers = activeLayers.filter((l) => layerVisibility[l.id] && l.legend?.length);

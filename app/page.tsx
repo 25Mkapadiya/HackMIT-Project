@@ -18,8 +18,8 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 });
 
 export default function Home() {
-  const [layersCollapsed, setLayersCollapsed] = useState(false);
-  const [scenarioCollapsed, setScenarioCollapsed] = useState(false);
+  const [layersCollapsed, setLayersCollapsed] = useState(true);
+  const [scenarioCollapsed, setScenarioCollapsed] = useState(true);
 
   return (
     <main className="relative h-dvh w-dvw overflow-hidden bg-base-950">
