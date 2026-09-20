@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import DraggablePanel from "@/components/ui/DraggablePanel";
-import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 import { useAppStore } from "@/store/useAppStore";
 import { getState, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
 import type { LayerCategory } from "@/lib/types";
@@ -53,6 +52,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
 export default function LayerControlPanel({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const layerVisibility = useAppStore((s) => s.layerVisibility);
   const toggleLayer = useAppStore((s) => s.toggleLayer);
+  const resetLayerVisibility = useAppStore((s) => s.resetLayerVisibility);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
   const activeLayers = showAllStates
@@ -85,7 +85,16 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
       headerAccent="#8fa3bf"
       draggable={false}
     >
-      <div className="px-3 py-2">
+      <div className="px-3 pt-2 pb-1 flex justify-end">
+        <button
+          onClick={resetLayerVisibility}
+          className="text-[10.5px] font-medium text-ink-500 hover:text-ink-100 hover:bg-base-800 px-2 py-1 rounded-md transition-colors"
+          title="Reset every layer's visibility back to this state's defaults"
+        >
+          Return to Default
+        </button>
+      </div>
+      <div className="px-3 pb-2">
         {CATEGORY_ORDER.map((cat) => {
           const layers = activeLayers.filter((l) => l.category === cat);
           if (layers.length === 0) return null;
@@ -119,7 +128,6 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
                         <div className="min-w-0">
                           <div className="text-[11.5px] text-ink-100 truncate">{layer.shortName ?? layer.name}</div>
                         </div>
-                        <ConfidenceBadge confidence={layer.confidence} />
                       </div>
                       <Toggle checked={Boolean(layerVisibility[layer.id])} onChange={() => toggleLayer(layer.id)} />
                     </div>

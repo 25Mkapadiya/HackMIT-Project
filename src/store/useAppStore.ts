@@ -24,6 +24,7 @@ interface AppState {
   // layers
   layerVisibility: Record<string, boolean>;
   toggleLayer: (id: string) => void;
+  resetLayerVisibility: () => void;
 
   // propose-mode
   proposeMode: boolean;
@@ -90,6 +91,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   layerVisibility: defaultLayerVisibility(DEFAULT_STATE_ID),
   toggleLayer: (id) =>
     set((s) => ({ layerVisibility: { ...s.layerVisibility, [id]: !s.layerVisibility[id] } })),
+  resetLayerVisibility: () =>
+    set((s) => {
+      if (!s.showAllStates) return { layerVisibility: defaultLayerVisibility(s.activeStateId) };
+      const merged: Record<string, boolean> = {};
+      for (const state of getShowAllStates()) {
+        for (const layer of state.layers) {
+          merged[layer.id] = Boolean(layer.defaultVisible);
+        }
+      }
+      return { layerVisibility: merged };
+    }),
 
   proposeMode: false,
   setProposeMode: (v) => set({ proposeMode: v }),

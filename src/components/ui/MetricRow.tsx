@@ -1,5 +1,4 @@
 import type { Metric } from "@/lib/types";
-import ConfidenceBadge from "./ConfidenceBadge";
 import ProvenanceTag from "./ProvenanceTag";
 
 function formatValue(v: unknown, unit?: string): string {
@@ -26,9 +25,6 @@ export default function MetricRow<T>({ metric }: { metric: Metric<T> }) {
       </div>
       <div className="text-right shrink-0">
         <div className="text-[13px] font-semibold text-ink-100 font-mono">{formatValue(metric.value, metric.unit)}</div>
-        <div className="mt-0.5">
-          <ConfidenceBadge confidence={metric.confidence} />
-        </div>
       </div>
     </div>
   );

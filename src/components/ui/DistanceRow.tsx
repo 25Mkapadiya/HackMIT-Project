@@ -1,5 +1,4 @@
 import type { DistanceResult } from "@/lib/types";
-import ConfidenceBadge from "./ConfidenceBadge";
 import ProvenanceTag from "./ProvenanceTag";
 
 export default function DistanceRow({
@@ -24,9 +23,6 @@ export default function DistanceRow({
         {(result.nearestFeatureLabel || extra) && (
           <div className="text-[10px] text-ink-500 truncate max-w-[140px]">{extra ?? result.nearestFeatureLabel}</div>
         )}
-        <div className="mt-0.5">
-          <ConfidenceBadge confidence={result.confidence} />
-        </div>
       </div>
     </div>
   );
