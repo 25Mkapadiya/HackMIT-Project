@@ -118,6 +118,33 @@ export const NATIONAL_SOURCES = {
     methodology:
       "Percent of households in the Census tract containing the site reporting a wireline broadband subscription (cable, fiber, or DSL — variable S2801_C02_017E) and, for context, any broadband subscription including cellular/satellite (S2801_C02_014E). A household-subscription (demand-side) figure, not a survey of what a provider could deliver to a new commercial site — treat as connectivity context, not a substitute for calling carriers.",
   },
+  /**
+   * Long-haul carrier fiber routes are largely proprietary/security-sensitive
+   * and there is no public nationwide dataset of actual conduit routes (HIFLD
+   * has historically not published one at route level, for the same reason it
+   * doesn't publish transmission-line capacity). These two live TIGERweb
+   * layers stand in as a geographic PROXY — carriers commonly, not
+   * universally, bury long-haul conduit within Interstate highway and active
+   * rail rights-of-way — not a fiber-route survey. See fiber.ts.
+   */
+  tigerInterstates: {
+    id: "census-tigerweb-primary-roads-interstates",
+    name: "US Census Bureau — TIGERweb Primary Roads (Interstates)",
+    url: "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/2",
+    license: "Public domain (US Census Bureau)",
+    refreshFrequency: "Live ArcGIS MapServer",
+    methodology:
+      "Interstate highway centerlines (RTTYP='I') queried live by bounding box, used only as a corridor-proximity proxy for likely long-haul fiber routes.",
+  },
+  tigerRailroads: {
+    id: "census-tigerweb-railroads",
+    name: "US Census Bureau — TIGERweb Railroads",
+    url: "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/9",
+    license: "Public domain (US Census Bureau)",
+    refreshFrequency: "Live ArcGIS MapServer",
+    methodology:
+      "Active rail line centerlines queried live by bounding box, used only as a corridor-proximity proxy for likely long-haul fiber routes.",
+  },
   cartoForestCover: {
     id: "carto-osm-forest-cover",
     name: "CARTO Vector Basemap — OSM Landcover (wood)",
