@@ -53,6 +53,38 @@ export function synthesizeGaps(
     detail: "Transmission proximity does not indicate available substation/feeder headroom. A formal interconnection study with the serving utility or transmission operator is the standard next step for a facility of this size.",
   });
 
+  const nearestSubMi = power.nearestSubstation.distanceMiles;
+  const substationLabel = power.nearestSubstation.nearestFeatureLabel;
+  if (nearestSubMi == null) {
+    gaps.push({
+      category: "power",
+      severity: "likely_required",
+      summary: "No known substation found near this site.",
+      detail: "No mapped substation was found within the search radius. A new substation or a long distribution/transmission extension is likely required to interconnect this facility.",
+    });
+  } else if (nearestSubMi > TRANSMISSION_PROXIMITY_BANDS.moderate) {
+    gaps.push({
+      category: "power",
+      severity: "likely_required",
+      summary: `Nearest known substation is ${nearestSubMi} mi away.`,
+      detail: "At this distance, a new substation or significant distribution/transmission build-out is likely required to interconnect the facility economically — plan for materially higher interconnection cost and lead time than a closer site.",
+    });
+  } else if (nearestSubMi > TRANSMISSION_PROXIMITY_BANDS.close) {
+    gaps.push({
+      category: "power",
+      severity: "watch",
+      summary: `Nearest known substation (${substationLabel ?? "unnamed"}) is ${nearestSubMi} mi away.`,
+      detail: "A dedicated feeder or short transmission tap to the nearest substation is likely needed, adding cost and schedule versus a facility sited directly adjacent to one.",
+    });
+  } else if (nearestSubMi <= TRANSMISSION_PROXIMITY_BANDS.veryClose) {
+    gaps.push({
+      category: "power",
+      severity: "info",
+      summary: `${substationLabel ?? "A known substation"} is only ${nearestSubMi} mi away${power.nearestSubstation.maxVoltageKv ? ` (up to ${power.nearestSubstation.maxVoltageKv} kV)` : ""}.`,
+      detail: "Close substation proximity is a favorable siting signal that typically shortens the interconnection tap and lowers its cost — but it does not confirm available headroom, which still requires a utility interconnection study.",
+    });
+  }
+
   const demandPressure = power.gridDemandPressure.demandPressureLabel;
   const densityInfo = power.gridDemandPressure.value;
   if ((demandPressure === "High" || demandPressure === "Very High") && densityInfo) {

@@ -46,7 +46,7 @@ export const IL_LAYERS: LayerDefinition[] = [
     confidence: "fact",
     description:
       "HIFLD electric substation locations (nationwide legacy extract, static — see source note), split by transmission voltage tier. Distance to the nearest substation is a proxy for interconnection access, not confirmed available capacity.",
-    defaultVisible: false,
+    defaultVisible: true,
     endpoint: "/api/gis/electric-substations",
     legend: [
       { label: "345 kV+", color: "#ff5470", swatch: "circle" },

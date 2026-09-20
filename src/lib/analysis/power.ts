@@ -119,11 +119,16 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
 
   const nearestSubstationResult = nearestFeature(lng, lat, substationFc);
   const substationProps = nearestSubstationResult.feature?.properties ?? null;
+  const substationGeometry = nearestSubstationResult.feature?.geometry;
+  const substationCoords =
+    substationGeometry?.type === "Point" ? (substationGeometry.coordinates as [number, number]) : null;
   const nearestSubstation: PowerAnalysis["nearestSubstation"] = {
     distanceMiles: nearestSubstationResult.distanceMiles,
     nearestFeatureLabel: substationProps?.Name ?? (substationProps ? `Substation (${substationProps.County ?? "unnamed"})` : null),
     maxVoltageKv: substationProps?.MaxVoltKv ?? null,
     lineCount: substationProps?.Lines ?? null,
+    lng: substationCoords?.[0] ?? null,
+    lat: substationCoords?.[1] ?? null,
     confidence: nearestSubstationResult.feature ? "fact" : "unknown",
     source: NATIONAL_SOURCES.hifldSubstations,
   };
