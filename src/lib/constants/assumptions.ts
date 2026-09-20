@@ -69,7 +69,15 @@ export const GALLONS_PER_LITER = 0.264172;
  * DOE notes many systems operate around 2–4 cycles, while 6+ may be achievable.
  * Four cycles is a transparent, middle-of-typical-range planning assumption.
  */
-export const COOLING_TOWER_CYCLES_OF_CONCENTRATION = 4;
+export const COOLING_TOWER_CYCLES_OF_CONCENTRATION = 4;;
+
+/**
+ * DOE FEMP full-load cooling-tower table: at 4 cycles of concentration,
+ * a 100-ton chiller uses 4,930 gal/day of cooling-tower make-up water.
+ * The table scales linearly with chiller tonnage, so 49.3 gal/ton-day is
+ * the appropriate planning factor at 4 cycles for 24/7 full-load operation.
+ */
+export const COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC = 49.3;
 
 /**
  * Closed chilled-water loop planning assumptions.
