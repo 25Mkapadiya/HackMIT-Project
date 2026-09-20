@@ -22,7 +22,7 @@ export const SD_LAYERS: LayerDefinition[] = [
     legend: [
       { label: "500 kV+", color: "#ff5470", swatch: "line", lineWidth: 3 },
       { label: "230–499 kV", color: "#f2b93b", swatch: "line", lineWidth: 2.5 },
-      { label: "115–229 kV", color: "#f2d98b", swatch: "line", lineWidth: 2 },
+      { label: "115–229 kV", color: "#3bf2a0", swatch: "line", lineWidth: 2 },
       { label: "< 115 kV / unknown", color: "#8fa3bf", swatch: "line", lineWidth: 1.5 },
     ],
   },

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { STATE_REGISTRY, getState, getShowAllStates } from "@/states/registry";
+import { STATE_REGISTRY, getState, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
 
 export default function TopBar() {
   const proposeMode = useAppStore((s) => s.proposeMode);
@@ -13,6 +13,7 @@ export default function TopBar() {
   const setComparisonOpen = useAppStore((s) => s.setComparisonOpen);
   const graphOpen = useAppStore((s) => s.graphOpen);
   const setGraphOpen = useAppStore((s) => s.setGraphOpen);
+  const resetToDefault = useAppStore((s) => s.resetToDefault);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const setActiveStateId = useAppStore((s) => s.setActiveStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
@@ -70,22 +71,33 @@ export default function TopBar() {
     setComparisonOpen(true);
   };
 
+  const handleResetToDefault = () => {
+    if (scenarios.length === 0 && activeStateId === DEFAULT_STATE_ID && !showAllStates) return;
+    const proceed = window.confirm(
+      "Reset the site back to defaults? This clears every proposed data center and its analysis, and returns the map/layers to their starting view."
+    );
+    if (proceed) resetToDefault();
+  };
+
   return (
-    <div className="absolute top-0 left-0 right-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 h-14 glass-panel border-b border-base-700">
+    <div
+      className="absolute top-0 left-0 right-0 z-30 grid grid-cols-[auto_auto_auto] lg:grid-cols-[1fr_auto_1fr] items-center justify-between lg:justify-normal gap-1.5 lg:gap-4 px-2 lg:px-4 h-14 glass-panel border-b border-base-700"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)", height: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
+    >
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2">
           <div className="shrink-0 rounded-md bg-white px-1.5 py-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-full.png" alt="GEO: Graphical Energy Outcomes" className="h-6 w-auto block" />
+            <img src="/logo-full.png" alt="GEO: Graphical Energy Outcomes" className="h-5 lg:h-6 w-auto block" />
           </div>
           {subtitle && (
-            <div className="text-[9.5px] text-ink-500 tracking-wide truncate max-w-[220px]">{subtitle}</div>
+            <div className="hidden lg:block text-[9.5px] text-ink-500 tracking-wide truncate max-w-[220px]">{subtitle}</div>
           )}
         </div>
 
         <div
           ref={stateSearchRef}
-          className="relative hidden sm:block ml-3 pl-3 border-l border-base-700"
+          className="relative hidden lg:block ml-3 pl-3 border-l border-base-700"
         >
           <div
             className={`flex items-center gap-2 h-8 w-[210px] rounded-md border px-2.5 transition-colors ${
@@ -188,42 +200,56 @@ export default function TopBar() {
         </div>
       </div>
 
-      <div className="justify-self-center flex items-center gap-2">
+      <div className="justify-self-center flex items-center gap-1 lg:gap-2 overflow-x-auto no-scrollbar max-w-full">
         <button
           onClick={() => setProposeMode(!proposeMode)}
           disabled={!showAllStates && !activeState?.enabled}
-          className={`text-[14px] font-semibold px-6 py-2.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+          className={`shrink-0 text-[11px] lg:text-[14px] font-semibold px-2.5 lg:px-6 py-1.5 lg:py-2.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
             proposeMode
               ? "bg-accent-proposed text-white shadow-[0_0_0_3px_rgba(255,84,112,0.25)]"
               : "bg-ink-100 text-base-950 hover:brightness-95"
           }`}
         >
-          {proposeMode ? "Click the map to place site…" : "+ Propose Data Center"}
+          {proposeMode ? (
+            <>
+              <span className="lg:hidden">Tap map to place…</span>
+              <span className="hidden lg:inline">Click the map to place site…</span>
+            </>
+          ) : (
+            <>
+              <span className="lg:hidden">+ Propose</span>
+              <span className="hidden lg:inline">+ Propose Data Center</span>
+            </>
+          )}
         </button>
         <button
           onClick={() => setGraphOpen(!graphOpen)}
-          className={`text-[14px] font-semibold px-4 py-2.5 rounded-md border transition-all ${
+          className={`shrink-0 text-[11px] lg:text-[14px] font-semibold px-2.5 lg:px-4 py-1.5 lg:py-2.5 rounded-md border transition-all ${
             graphOpen
               ? "border-accent-power/60 bg-accent-power/15 text-accent-power"
               : "border-base-600 text-ink-200 hover:bg-base-800 hover:text-ink-100"
           }`}
           title="Graph one EU data-centre variable against another"
         >
-          Graph Data
+          <span className="lg:hidden">Graph</span>
+          <span className="hidden lg:inline">Graph Data</span>
         </button>
       </div>
 
-      <div className="flex items-center justify-end gap-2 shrink-0">
+      <div className="flex items-center justify-end gap-1 lg:gap-2 shrink-0 overflow-x-auto no-scrollbar max-w-full">
         <button
           onClick={() => setShowAllStates(!showAllStates)}
-          className={`text-[12px] font-semibold px-3 py-1.5 rounded-md border transition-all ${
+          className={`shrink-0 text-[10.5px] lg:text-[12px] font-semibold px-2 lg:px-3 py-1 lg:py-1.5 rounded-md border transition-all ${
             showAllStates
               ? "border-emerald-400/60 bg-emerald-400/15 text-emerald-300"
               : "border-base-600 text-ink-200 hover:bg-base-800 hover:text-ink-100"
           }`}
           title="Display infrastructure data for every implemented state at once"
         >
-          {showAllStates ? `Showing All (${implementedStates.length})` : `Show All (${implementedStates.length})`}
+          <span className="lg:hidden">{implementedStates.length}</span>
+          <span className="hidden lg:inline">
+            {showAllStates ? `Showing All (${implementedStates.length})` : `Show All (${implementedStates.length})`}
+          </span>
         </button>
         <button
           onClick={openComparison}
@@ -233,9 +259,21 @@ export default function TopBar() {
               ? "Propose 2+ sites to compare placements"
               : "Compare proposed sites side by side to judge the best placement"
           }
-          className="text-[12px] font-medium px-3 py-1.5 rounded-md border border-base-600 text-ink-100 hover:bg-base-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          className="shrink-0 text-[10.5px] lg:text-[12px] font-medium px-2 lg:px-3 py-1 lg:py-1.5 rounded-md border border-base-600 text-ink-100 hover:bg-base-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
         >
-          Compare Sites{scenarios.length >= 2 ? ` (${scenarios.length})` : ""}
+          <span className="lg:hidden">Compare{scenarios.length >= 2 ? ` (${scenarios.length})` : ""}</span>
+          <span className="hidden lg:inline">Compare Sites{scenarios.length >= 2 ? ` (${scenarios.length})` : ""}</span>
+        </button>
+        <button
+          onClick={handleResetToDefault}
+          title="Clear every proposed site and reset the map/layers to their defaults"
+          className="shrink-0 flex items-center gap-1 text-[10.5px] lg:text-[12px] font-medium px-2 lg:px-3 py-1 lg:py-1.5 rounded-md border border-base-600 text-ink-300 hover:bg-base-800 hover:text-ink-100 transition-colors"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <path d="M3 4v5h5" />
+          </svg>
+          <span className="hidden lg:inline">Reset</span>
         </button>
       </div>
     </div>

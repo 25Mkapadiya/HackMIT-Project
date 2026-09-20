@@ -227,20 +227,20 @@ export default function ComparisonPanel() {
   const sites = comparisonIds.map((id) => scenarios.find((s) => s.id === id)).filter(Boolean) as typeof scenarios;
 
   return (
-    <div className="absolute inset-0 z-40 bg-base-950/70 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-      <div className="glass-panel border border-base-700 rounded-xl shadow-panel w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-base-700">
-          <div>
+    <div className="absolute inset-0 z-40 bg-base-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-6 animate-fade-in">
+      <div className="glass-panel border border-base-700 rounded-xl shadow-panel w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-3.5 border-b border-base-700">
+          <div className="min-w-0">
             <div className="text-[13px] font-semibold text-ink-100">Site Comparison</div>
-            <div className="text-[10.5px] text-ink-500">
+            <div className="hidden sm:block text-[10.5px] text-ink-500">
               <span className="text-emerald-400 font-semibold">BEST</span> flags the objectively better value per row (lower distance/PUE/water use/etc.) — still no single composite score, since real tradeoffs (e.g. cost vs. efficiency) depend on your priorities.
             </div>
           </div>
-          <button onClick={() => setComparisonOpen(false)} className="text-ink-500 hover:text-ink-100 text-lg leading-none px-2">
+          <button onClick={() => setComparisonOpen(false)} className="shrink-0 text-ink-500 hover:text-ink-100 text-lg leading-none px-2">
             ×
           </button>
         </div>
-        <div className="overflow-auto px-5 py-4">
+        <div className="overflow-auto px-3 sm:px-5 py-3 sm:py-4">
           <table className="w-full border-collapse min-w-[560px]">
             <thead>
               <tr>

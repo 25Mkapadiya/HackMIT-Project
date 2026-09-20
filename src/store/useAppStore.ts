@@ -56,6 +56,9 @@ interface AppState {
   // EU data-centre graph window
   graphOpen: boolean;
   setGraphOpen: (v: boolean) => void;
+
+  /** Clears every proposed site/analysis and restores the default view/layers/camera — a full app reset, not just layer visibility. */
+  resetToDefault: () => void;
 }
 
 let scenarioCounter = 0;
@@ -203,4 +206,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   setComparisonOpen: (v) => set({ comparisonOpen: v }),
   graphOpen: false,
   setGraphOpen: (v) => set({ graphOpen: v }),
+
+  resetToDefault: () =>
+    set((s) => ({
+      activeStateId: DEFAULT_STATE_ID,
+      showAllStates: false,
+      layerVisibility: defaultLayerVisibility(DEFAULT_STATE_ID),
+      cameraResetToken: s.cameraResetToken + 1,
+      proposeMode: false,
+      scenarios: [],
+      activeScenarioId: null,
+      analysisByScenario: {},
+      comparisonIds: [],
+      comparisonOpen: false,
+      graphOpen: false,
+    })),
 }));

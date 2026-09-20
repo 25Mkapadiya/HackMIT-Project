@@ -23,12 +23,16 @@ export function buildLayerSpecs(
   const mapLayerId = idPrefix ? `${idPrefix}-${layer.id}` : layer.id;
 
   if (layer.id === "transmission-lines") {
+    // Distinct hues per tier (slate -> teal -> amber -> rose), not shades of
+    // the same yellow — "115-229 kV" and "230-499 kV" used to both be
+    // low-saturation yellows (#f2d98b / #f2b93b) that were hard to tell apart
+    // at a glance, especially at thin line widths.
     const voltageColor: DataDrivenPropertyValueSpecification<string> = [
       "step",
       ["coalesce", ["get", "VoltageMeas"], 0],
       "#8fa3bf",
       115,
-      "#f2d98b",
+      "#3bf2a0",
       230,
       "#f2b93b",
       500,

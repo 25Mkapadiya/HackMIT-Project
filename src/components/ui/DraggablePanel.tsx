@@ -80,7 +80,18 @@ export default function DraggablePanel({
     <div
       ref={panelRef}
       className={`absolute z-20 glass-panel rounded-xl border border-base-700 shadow-panel animate-slide-up ${className}`}
-      style={{ ...style, width, userSelect: dragging ? "none" : undefined }}
+      style={{
+        ...style,
+        // Collapsed panels shrink to fit their header (so two pinned panels
+        // don't overlap on a phone-width screen); expanded panels keep their
+        // fixed width but never exceed the viewport.
+        width: collapsed ? "auto" : width,
+        // Even collapsed, cap width so two pinned panels (one anchored left,
+        // one right) can't overlap in the middle on a narrow phone screen —
+        // long titles ellipsize via `truncate` instead.
+        maxWidth: collapsed ? "calc(50vw - 20px)" : "calc(100vw - 24px)",
+        userSelect: dragging ? "none" : undefined,
+      }}
     >
       <div
         className={`flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-t-xl border-b border-base-700/80 ${
