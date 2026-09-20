@@ -450,7 +450,13 @@ export default function MapView() {
     if (cameraTarget === lastCameraTargetRef.current) return;
 
     if (showAllStates) {
-      mapRef.current.fitBounds(implementedStatesBounds(), { padding: 72, duration: 1200 });
+      // Extra top padding (vs. the other sides) leaves room above the fitted
+      // mainland bbox so the view settles a touch further north, revealing a
+      // sliver of Canada instead of cropping tight to the border.
+      mapRef.current.fitBounds(implementedStatesBounds(), {
+        padding: { top: 160, bottom: 72, left: 72, right: 72 },
+        duration: 1200,
+      });
     } else {
       const state = getState(activeStateId);
       if (state) mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
