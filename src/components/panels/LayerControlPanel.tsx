@@ -117,7 +117,20 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
                     <span className="text-[9.5px] text-ink-500 font-mono">{activeCount}</span>
                   )}
                 </div>
-                <span className="text-ink-500 text-[10px]">{isOpen ? "▾" : "▸"}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className={`h-3.5 w-3.5 shrink-0 text-ink-300 group-hover:text-ink-100 transition-transform ${
+                    isOpen ? "" : "-rotate-90"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </button>
               {isOpen && (
                 <div className="pl-3.5 pb-1.5 space-y-0.5">

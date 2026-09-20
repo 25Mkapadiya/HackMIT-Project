@@ -91,7 +91,9 @@ export default function ScenarioPanel({ collapsed, onToggleCollapse }: { collaps
               <button
                 onClick={() => runAnalysis(active.id)}
                 disabled={analysisState?.status === "loading"}
-                className="flex-1 bg-accent-proposed text-white text-[12px] font-semibold py-2 rounded-md hover:brightness-110 disabled:opacity-60 transition-all"
+                className={`flex-1 bg-accent-proposed text-white text-[12px] font-semibold py-2 rounded-md transition-all ${
+                  analysisState?.status === "loading" ? "opacity-60 cursor-not-allowed" : "hover:brightness-110"
+                }`}
               >
                 {analysisState?.status === "loading" ? "Analyzing…" : "Run Site Analysis"}
               </button>

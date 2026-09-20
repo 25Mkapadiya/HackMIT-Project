@@ -101,9 +101,22 @@ export default function DraggablePanel({
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="text-ink-500 hover:text-ink-100 transition-colors text-xs px-1.5 py-0.5 rounded hover:bg-base-800"
+            aria-label={collapsed ? "Expand panel" : "Collapse panel"}
+            aria-expanded={!collapsed}
+            className="shrink-0 text-ink-300 hover:text-ink-100 transition-colors p-1 rounded hover:bg-base-800"
           >
-            {collapsed ? "▸" : "▾"}
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
           </button>
         )}
       </div>

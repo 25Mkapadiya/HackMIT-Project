@@ -2,24 +2,40 @@
 
 import { Fragment } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 import type { ScenarioAnalysis } from "@/lib/types";
 
-function cell(value: string | number | null | undefined, confidence?: "fact" | "estimated" | "proxy" | "unknown") {
+// Known low-to-high severity scales used across the analysis, so a categorical
+// label like "High" water stress can still be ranked against another site's
+// "Low" the same way a numeric distance can — without inventing a composite score.
+const SEVERITY_RANK: Record<string, number> = {
+  Low: 0,
+  Moderate: 1,
+  Medium: 1,
+  High: 2,
+  "Very High": 3,
+};
+
+function cell(value: string | number | null | undefined, isBest: boolean) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[12px] text-ink-100 font-mono">{value ?? "—"}</span>
-      {confidence && <ConfidenceBadge confidence={confidence} />}
-    </div>
+    <span className={`text-[12px] font-mono ${isBest ? "text-emerald-300 font-semibold" : "text-ink-100"}`}>
+      {value ?? "—"}
+      {isBest && <span className="ml-1 text-[9px] font-sans font-bold tracking-wide text-emerald-400">BEST</span>}
+    </span>
   );
 }
 
 interface Row {
   label: string;
   get: (a: ScenarioAnalysis) => { value: string | number | null; confidence: "fact" | "estimated" | "proxy" | "unknown" };
+  /** Only set for metrics where "better" is objectively unambiguous — never for context-dependent ones like population or acreage. */
+  rank?: (a: ScenarioAnalysis) => number | null;
+  better?: "lower" | "higher";
 }
 
-const ROWS: { section: string; color: string; rows: Row[] }[] = [
+const distanceRank = (miles: number | null) => miles;
+const severityRank = (label: string | null | undefined) => (label != null ? SEVERITY_RANK[label] ?? null : null);
+
+const ROWS: { section: string; color: string; note?: string; rows: Row[] }[] = [
   {
     section: "Power",
     color: "#f2b93b",
@@ -31,6 +47,8 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
           value: a.power.nearestTransmission.distanceMiles != null ? `${a.power.nearestTransmission.distanceMiles} mi` : null,
           confidence: a.power.nearestTransmission.confidence,
         }),
+        rank: (a) => distanceRank(a.power.nearestTransmission.distanceMiles),
+        better: "lower",
       },
       {
         label: "Nearest ≥230 kV",
@@ -38,6 +56,23 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
           value: a.power.nearest230kv.distanceMiles != null ? `${a.power.nearest230kv.distanceMiles} mi` : null,
           confidence: a.power.nearest230kv.confidence,
         }),
+        rank: (a) => distanceRank(a.power.nearest230kv.distanceMiles),
+        better: "lower",
+      },
+      {
+        label: "Nearest substation",
+        get: (a) => ({
+          value: a.power.nearestSubstation.distanceMiles != null ? `${a.power.nearestSubstation.distanceMiles} mi` : null,
+          confidence: a.power.nearestSubstation.confidence,
+        }),
+        rank: (a) => distanceRank(a.power.nearestSubstation.distanceMiles),
+        better: "lower",
+      },
+      {
+        label: "Grid demand pressure",
+        get: (a) => ({ value: a.power.gridDemandPressure.demandPressureLabel, confidence: a.power.gridDemandPressure.confidence }),
+        rank: (a) => severityRank(a.power.gridDemandPressure.demandPressureLabel),
+        better: "lower",
       },
       { label: "Utility territory", get: (a) => ({ value: a.power.utilityTerritory.value, confidence: a.power.utilityTerritory.confidence }) },
       {
@@ -45,6 +80,28 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
         get: (a) => ({
           value: a.power.nearbyGeneration.value ? `${Math.round(a.power.nearbyGeneration.value.totalMw)} MW` : null,
           confidence: a.power.nearbyGeneration.confidence,
+        }),
+        rank: (a) => a.power.nearbyGeneration.value?.totalMw ?? null,
+        better: "higher",
+      },
+    ],
+  },
+  {
+    section: "Efficiency",
+    color: "#e0a84a",
+    note: "Modeled from cooling technology + local grid demand pressure — a heuristic, not a measured PUE.",
+    rows: [
+      {
+        label: "Estimated PUE",
+        get: (a) => ({ value: a.efficiency.estimatedPue.value.toFixed(2), confidence: a.efficiency.estimatedPue.confidence }),
+        rank: (a) => a.efficiency.estimatedPue.value,
+        better: "lower",
+      },
+      {
+        label: "Water-stress cooling risk",
+        get: (a) => ({
+          value: a.efficiency.estimatedPue.factors.some((f) => f.label.startsWith("Water-stress")) ? "Flagged" : "None",
+          confidence: "estimated",
         }),
       },
     ],
@@ -59,7 +116,25 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
           value: a.water.estimatedConsumptionGalPerDay.value != null ? `${a.water.estimatedConsumptionGalPerDay.value.toLocaleString()} gal/day` : null,
           confidence: a.water.estimatedConsumptionGalPerDay.confidence,
         }),
+        rank: (a) => a.water.estimatedConsumptionGalPerDay.value,
+        better: "lower",
       },
+      {
+        label: "Est. withdrawal",
+        get: (a) => ({
+          value: a.water.estimatedWithdrawalGalPerDay.value != null ? `${a.water.estimatedWithdrawalGalPerDay.value.toLocaleString()} gal/day` : null,
+          confidence: a.water.estimatedWithdrawalGalPerDay.confidence,
+        }),
+        rank: (a) => a.water.estimatedWithdrawalGalPerDay.value,
+        better: "lower",
+      },
+      {
+        label: "Water stress",
+        get: (a) => ({ value: a.water.waterStressLabel.value, confidence: a.water.waterStressLabel.confidence }),
+        rank: (a) => severityRank(a.water.waterStressLabel.value),
+        better: "lower",
+      },
+      { label: "Drought status", get: (a) => ({ value: a.water.droughtStatus.value, confidence: a.water.droughtStatus.confidence }) },
       {
         label: "Nearest water body",
         get: (a) => ({
@@ -67,8 +142,34 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
           confidence: a.water.nearestWaterBody.confidence,
         }),
       },
-      { label: "Water stress (proxy)", get: (a) => ({ value: a.water.waterStressLabel.value, confidence: a.water.waterStressLabel.confidence }) },
-      { label: "Drought status", get: (a) => ({ value: a.water.droughtStatus.value, confidence: a.water.droughtStatus.confidence }) },
+    ],
+  },
+  {
+    section: "Environment / Community",
+    color: "#3bf2a0",
+    rows: [
+      { label: "FEMA flood zone", get: (a) => ({ value: a.land.femaFloodZone.value, confidence: a.land.femaFloodZone.confidence }) },
+      {
+        label: "Environmental constraints flagged",
+        get: (a) => ({ value: a.land.environmentalConstraints.value.length, confidence: a.land.environmentalConstraints.confidence }),
+        rank: (a) => a.land.environmentalConstraints.value.length,
+        better: "lower",
+      },
+      {
+        label: "Population within 5 mi",
+        get: (a) => ({
+          value: a.land.populationWithin5mi.value != null ? a.land.populationWithin5mi.value.toLocaleString() : null,
+          confidence: a.land.populationWithin5mi.confidence,
+        }),
+      },
+      {
+        label: "Nearest state highway",
+        get: (a) => ({
+          value: a.land.nearestMajorRoadMiles.value != null ? `${a.land.nearestMajorRoadMiles.value} mi` : null,
+          confidence: a.land.nearestMajorRoadMiles.confidence,
+        }),
+      },
+      { label: "County", get: (a) => ({ value: a.regulation.county.value, confidence: a.regulation.county.confidence }) },
     ],
   },
   {
@@ -81,29 +182,9 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
           value: a.fiber.nearestIxp.distanceMiles != null ? `${a.fiber.nearestIxp.distanceMiles} mi` : null,
           confidence: a.fiber.nearestIxp.confidence,
         }),
+        rank: (a) => distanceRank(a.fiber.nearestIxp.distanceMiles),
+        better: "lower",
       },
-    ],
-  },
-  {
-    section: "Environment / Community",
-    color: "#3bf2a0",
-    rows: [
-      { label: "FEMA flood zone", get: (a) => ({ value: a.land.femaFloodZone.value, confidence: a.land.femaFloodZone.confidence }) },
-      {
-        label: "Nearest state highway",
-        get: (a) => ({
-          value: a.land.nearestMajorRoadMiles.value != null ? `${a.land.nearestMajorRoadMiles.value} mi` : null,
-          confidence: a.land.nearestMajorRoadMiles.confidence,
-        }),
-      },
-      {
-        label: "Population within 5 mi",
-        get: (a) => ({
-          value: a.land.populationWithin5mi.value != null ? a.land.populationWithin5mi.value.toLocaleString() : null,
-          confidence: a.land.populationWithin5mi.confidence,
-        }),
-      },
-      { label: "County", get: (a) => ({ value: a.regulation.county.value, confidence: a.regulation.county.confidence }) },
     ],
   },
   {
@@ -111,7 +192,12 @@ const ROWS: { section: string; color: string; rows: Row[] }[] = [
     color: "#c9d3e0",
     rows: [
       { label: "Est. acreage", get: (a) => ({ value: `${a.development.acreage.value} ac`, confidence: a.development.acreage.confidence }) },
-      { label: "Infra. gaps flagged", get: (a) => ({ value: a.gaps.length, confidence: "fact" }) },
+      {
+        label: "Infra. gaps flagged",
+        get: (a) => ({ value: a.gaps.length, confidence: "fact" }),
+        rank: (a) => a.gaps.length,
+        better: "lower",
+      },
     ],
   },
 ];
@@ -134,7 +220,9 @@ export default function ComparisonPanel() {
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-base-700">
           <div>
             <div className="text-[13px] font-semibold text-ink-100">Site Comparison</div>
-            <div className="text-[10.5px] text-ink-500">Same factual metrics, side by side. No composite score — interpret the tradeoffs yourself.</div>
+            <div className="text-[10.5px] text-ink-500">
+              <span className="text-emerald-400 font-semibold">BEST</span> flags the objectively better value per row (lower distance/PUE/water use/etc.) — still no single composite score, since real tradeoffs (e.g. cost vs. efficiency) depend on your priorities.
+            </div>
           </div>
           <button onClick={() => setComparisonOpen(false)} className="text-ink-500 hover:text-ink-100 text-lg leading-none px-2">
             ×
@@ -165,29 +253,50 @@ export default function ComparisonPanel() {
                       <span className="text-[10.5px] font-bold uppercase tracking-[0.08em]" style={{ color: section.color }}>
                         {section.section}
                       </span>
+                      {section.note && <span className="ml-2 text-[9.5px] font-normal normal-case text-ink-600">{section.note}</span>}
                     </td>
                   </tr>
-                  {section.rows.map((row) => (
-                    <tr key={row.label} className="border-b border-base-800/60">
-                      <td className="text-[11.5px] text-ink-300 py-2 pr-4 whitespace-nowrap sticky left-0">{row.label}</td>
-                      {sites.map((s) => {
-                        const state = analysisByScenario[s.id];
-                        if (!state || state.status !== "ready") {
+                  {section.rows.map((row) => {
+                    const ranked = row.rank
+                      ? sites
+                          .map((s) => {
+                            const state = analysisByScenario[s.id];
+                            if (!state || state.status !== "ready") return null;
+                            const value = row.rank!(state.data);
+                            return value == null ? null : { id: s.id, value };
+                          })
+                          .filter((x): x is { id: string; value: number } => x !== null)
+                      : [];
+                    const bestValue =
+                      ranked.length >= 2
+                        ? row.better === "higher"
+                          ? Math.max(...ranked.map((r) => r.value))
+                          : Math.min(...ranked.map((r) => r.value))
+                        : null;
+
+                    return (
+                      <tr key={row.label} className="border-b border-base-800/60">
+                        <td className="text-[11.5px] text-ink-300 py-2 pr-4 whitespace-nowrap sticky left-0">{row.label}</td>
+                        {sites.map((s) => {
+                          const state = analysisByScenario[s.id];
+                          if (!state || state.status !== "ready") {
+                            return (
+                              <td key={s.id} className="py-2 pr-6 text-[11px] text-ink-700">
+                                —
+                              </td>
+                            );
+                          }
+                          const { value } = row.get(state.data);
+                          const isBest = bestValue != null && ranked.find((r) => r.id === s.id)?.value === bestValue;
                           return (
-                            <td key={s.id} className="py-2 pr-6 text-[11px] text-ink-700">
-                              —
+                            <td key={s.id} className="py-2 pr-6">
+                              {cell(value, isBest)}
                             </td>
                           );
-                        }
-                        const { value, confidence } = row.get(state.data);
-                        return (
-                          <td key={s.id} className="py-2 pr-6">
-                            {cell(value, confidence)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                        })}
+                      </tr>
+                    );
+                  })}
                 </Fragment>
               ))}
             </tbody>

@@ -33,10 +33,22 @@ export default function Legend() {
     >
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center justify-between text-[10px] font-semibold tracking-[0.08em] uppercase text-ink-500 mb-1.5"
+        aria-expanded={!collapsed}
+        className="w-full flex items-center justify-between text-[10px] font-semibold tracking-[0.08em] uppercase text-ink-500 hover:text-ink-100 transition-colors mb-1.5"
       >
         Legend
-        <span>{collapsed ? "▸" : "▾"}</span>
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
       {!collapsed && (
         <div className="space-y-2 max-h-[38vh] overflow-y-auto no-scrollbar pr-1">

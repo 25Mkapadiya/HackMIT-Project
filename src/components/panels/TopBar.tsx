@@ -136,15 +136,17 @@ export default function TopBar() {
               onClick={() => setStateSearchOpen((open) => !open)}
               aria-label="Browse all states"
               aria-expanded={stateSearchOpen}
-              className="shrink-0 text-ink-500 hover:text-ink-100 transition-colors"
+              className="shrink-0 text-ink-300 hover:text-ink-100 transition-colors p-0.5 -mr-0.5 rounded hover:bg-base-800"
             >
               <svg
                 viewBox="0 0 24 24"
                 aria-hidden="true"
-                className={`h-3 w-3 transition-transform ${stateSearchOpen ? "rotate-180" : ""}`}
+                className={`h-4 w-4 transition-transform ${stateSearchOpen ? "rotate-180" : ""}`}
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.5"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
                 <path d="m6 9 6 6 6-6" />
               </svg>
