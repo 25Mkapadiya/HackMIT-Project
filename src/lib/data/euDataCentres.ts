@@ -15,7 +15,7 @@ export interface EuVariable {
 export const EU_VARIABLES: EuVariable[] = [
   { key: "pdit", label: "Installed IT power demand (PDIT)", unit: "MW", source: "Table 24" },
   { key: "edc", label: "Total energy consumption (EDC)", unit: "GWh", source: "Table 24" },
-  { key: "win", label: "Total water consumption (WIN)", unit: "m³", source: "Table 24" },
+  { key: "win", label: "Water consumption per data centre (WIN)", unit: "m³/yr", source: "Table 24 (WIN ÷ reporting data centres)" },
   { key: "pue", label: "Average PUE", unit: "", source: "Table 25" },
   { key: "wue", label: "Average WUE", unit: "L/kWh", source: "Table 26" },
   { key: "erf", label: "Average ERF (energy reuse factor)", unit: "", source: "Table 27" },
@@ -63,7 +63,12 @@ export const EU_COUNTRIES: EuCountryRow[] = RAW.map((r) => ({
     reportingDcs: r[3],
     pdit: r[4],
     edc: r[5],
-    win: r[6],
+    // Table 24's WIN is a national total across every reporting data centre, so it's
+    // not comparable to one proposed site's estimated annual water use (a single site
+    // always reads as ~0 next to e.g. Belgium's 1.24M m³/yr total). Dividing by the
+    // reporting-data-centre count puts it on the same per-facility basis GraphPanel
+    // computes for a scenario (see scenarioValues's `win` in GraphPanel.tsx).
+    win: r[3] > 0 ? r[6] / r[3] : null,
     pue: r[7],
     wue: r[8],
     erf: r[9],
