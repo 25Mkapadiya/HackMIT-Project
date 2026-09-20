@@ -25,6 +25,7 @@ export const OR_SOURCES = {
     methodology: "Point-in-polygon lookup against ODOE's statewide electric service-area polygons (feeds the Find Your Utility tool). Polygons may overlap; the first containing polygon is reported. Not an official service-territory determination.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

@@ -10,6 +10,7 @@ import { getState, getEnabledStates, getShowAllStates, DEFAULT_STATE_ID } from "
 import { useAppStore } from "@/store/useAppStore";
 import { generateCampusFootprint } from "@/lib/spatial/campus";
 import type { LayerDefinition } from "@/lib/types";
+import { TRANSMISSION_PROXIMITY_BANDS } from "@/lib/constants/assumptions";
 import {
   BASEMAP_STYLE,
   US_MAINLAND_VIEW_BOUNDS,
@@ -187,6 +188,7 @@ export default function MapView() {
   const proposeMode = useAppStore((s) => s.proposeMode);
   const scenarios = useAppStore((s) => s.scenarios);
   const activeScenarioId = useAppStore((s) => s.activeScenarioId);
+  const analysisByScenario = useAppStore((s) => s.analysisByScenario);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
   const addScenario = useAppStore((s) => s.addScenario);
@@ -334,6 +336,56 @@ export default function MapView() {
           "fill-extrusion-height": ["coalesce", ["get", "heightM"], 15],
           "fill-extrusion-base": 0,
           "fill-extrusion-opacity": 0.88,
+        },
+      });
+
+      // Substation-proximity impact overlay: a dashed connector from each proposed
+      // site to its nearest known substation (from the power analysis, not the raw
+      // "electric-substations" layer — so it shows even while that layer is toggled
+      // off), colored by the same TRANSMISSION_PROXIMITY_BANDS used in the analysis
+      // text, plus a highlighted ring around the target substation and a distance
+      // label at the line's midpoint. See the "sync substation proximity links" effect.
+      map.addSource("substation-links", { type: "geojson", data: emptyFeatureCollection() });
+      map.addLayer({
+        id: "substation-links-line",
+        type: "line",
+        source: "substation-links",
+        filter: ["==", ["get", "kind"], "link"],
+        layout: { "line-cap": "round" },
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": 2,
+          "line-dasharray": [2, 1.6],
+          "line-opacity": 0.85,
+        },
+      });
+      map.addLayer({
+        id: "substation-links-distance-label",
+        type: "symbol",
+        source: "substation-links",
+        filter: ["==", ["get", "kind"], "midpoint"],
+        layout: {
+          "text-field": ["get", "distanceLabel"],
+          "text-size": 11,
+          "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+          "text-allow-overlap": false,
+        },
+        paint: {
+          "text-color": ["get", "color"],
+          "text-halo-color": "#0a0d12",
+          "text-halo-width": 1.4,
+        },
+      });
+      map.addLayer({
+        id: "substation-links-target",
+        type: "circle",
+        source: "substation-links",
+        filter: ["==", ["get", "kind"], "target"],
+        paint: {
+          "circle-radius": 8,
+          "circle-color": "transparent",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": ["get", "color"],
         },
       });
 
@@ -791,6 +843,59 @@ export default function MapView() {
     const campusSource = map.getSource("campus-buildings") as maplibregl.GeoJSONSource | undefined;
     campusSource?.setData(campusFc);
   }, [mapReady, scenarios, activeScenarioId]);
+
+  // ---- sync substation-proximity impact overlay (site -> nearest substation) ----
+  // Driven by the power analysis result (power.nearestSubstation), not the raw
+  // "electric-substations" data layer, so a placed site shows its proximity
+  // impact immediately once analysis runs, whether or not that layer is toggled on.
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    const bandColor = (miles: number | null): string => {
+      if (miles == null) return "#7d8ba0";
+      if (miles <= TRANSMISSION_PROXIMITY_BANDS.veryClose) return "#3bf2a0";
+      if (miles <= TRANSMISSION_PROXIMITY_BANDS.close) return "#f2b93b";
+      if (miles <= TRANSMISSION_PROXIMITY_BANDS.moderate) return "#f2703b";
+      return "#ff5470";
+    };
+
+    const features: FeatureCollection["features"] = [];
+    for (const scenario of scenarios) {
+      const analysis = analysisByScenario[scenario.id];
+      if (analysis?.status !== "ready") continue;
+      const sub = analysis.data.power.nearestSubstation;
+      if (sub.lng == null || sub.lat == null) continue;
+      const color = bandColor(sub.distanceMiles);
+      const origin: [number, number] = [scenario.lng, scenario.lat];
+      const target: [number, number] = [sub.lng, sub.lat];
+      const midpoint: [number, number] = [(origin[0] + target[0]) / 2, (origin[1] + target[1]) / 2];
+
+      features.push({
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: [origin, target] },
+        properties: { kind: "link", color, scenarioId: scenario.id },
+      });
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: target },
+        properties: { kind: "target", color, scenarioId: scenario.id },
+      });
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: midpoint },
+        properties: {
+          kind: "midpoint",
+          color,
+          scenarioId: scenario.id,
+          distanceLabel: `${sub.distanceMiles} mi`,
+        },
+      });
+    }
+
+    const linksSource = map.getSource("substation-links") as maplibregl.GeoJSONSource | undefined;
+    linksSource?.setData({ type: "FeatureCollection", features });
+  }, [mapReady, scenarios, analysisByScenario]);
 
   // ---- click a proposed site marker to select it ----
   useEffect(() => {

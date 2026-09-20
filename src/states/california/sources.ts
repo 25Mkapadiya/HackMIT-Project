@@ -25,6 +25,7 @@ export const CA_SOURCES = {
     methodology: "Point-in-polygon lookup against CEC statewide IOU and publicly owned utility service-area polygons. Per the CEC, boundaries are approximate (compiled from georeferenced territory maps and DHS data); contact the load-serving entity for authoritative territory. Community choice aggregators/other LSEs are in a separate CEC layer not integrated here.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

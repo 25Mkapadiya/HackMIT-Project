@@ -17,6 +17,7 @@ export const UT_SOURCES = {
     methodology: "No facility points are shown: the research names the Salt Lake Valley, West Jordan, Eagle Mountain, Saratoga Springs, Lehi and the Provo corridor as markets but provides no verified facility coordinates.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

@@ -11,6 +11,7 @@ import {
   fetchEiaPowerPlants,
   fetchHifldTransmissionLines,
   fetchHifldUtilityTerritories,
+  fetchHifldSubstations,
   fetchUsDroughtMonitor,
 } from "@/lib/gis/nationalFetchers";
 import { MO_SOURCES } from "./sources";
@@ -54,6 +55,7 @@ async function fetchDataCenters(bbox: Bbox): Promise<FeatureCollection<Point>> {
 const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = {
   "transmission-lines": fetchHifldTransmissionLines,
   "utility-territories": fetchHifldUtilityTerritories,
+  "electric-substations": fetchHifldSubstations,
   "hydrography-rivers": fetchNhdFlowline,
   "hydrography-waterbodies": fetchNhdWaterbody,
   "usgs-gauges": (bbox) => fetchUsgsGauges(bbox, "MO"),

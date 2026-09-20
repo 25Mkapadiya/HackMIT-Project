@@ -41,6 +41,11 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
         <DistanceRow label="Nearest ≥115 kV" result={power.nearest115kv} extra={power.nearest115kv.voltageKv ? `${power.nearest115kv.voltageKv} kV` : undefined} />
         <DistanceRow label="Nearest ≥230 kV" result={power.nearest230kv} extra={power.nearest230kv.voltageKv ? `${power.nearest230kv.voltageKv} kV` : undefined} />
         <DistanceRow label="Nearest 500 kV" result={power.nearest500kv} extra={power.nearest500kv.voltageKv ? `${power.nearest500kv.voltageKv} kV` : undefined} />
+        <DistanceRow
+          label="Nearest substation"
+          result={power.nearestSubstation}
+          extra={power.nearestSubstation.maxVoltageKv ? `up to ${power.nearestSubstation.maxVoltageKv} kV${power.nearestSubstation.lineCount ? ` — ${power.nearestSubstation.lineCount} lines` : ""}` : undefined}
+        />
         <MetricRow metric={power.utilityTerritory} />
         <MetricRow
           metric={{

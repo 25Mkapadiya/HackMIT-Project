@@ -165,4 +165,22 @@ export const NATIONAL_SOURCES = {
     refreshFrequency: "Weekly, released Thursdays",
     methodology: "Point-in-polygon lookup against the current weekly drought classification (D0 abnormally dry through D4 exceptional drought).",
   },
+  /**
+   * Same HIFLD-deactivation situation as hifldTransmission/hifldUtilityTerritories
+   * above — this is a live ArcGIS Online mirror ("HIFLD Legacy") of HIFLD's
+   * nationwide "Electric Substations" point dataset, split across 8 sub-layers
+   * by voltage tier (see fetchHifldSubstations in nationalFetchers.ts, which
+   * queries all 8 and merges them). Substation *location* is public; substation
+   * *headroom/available capacity* is not — see PowerAnalysis.gridCapacity,
+   * which stays "Unknown" even once a nearest substation is found.
+   */
+  hifldSubstations: {
+    id: "hifld-electric-substations",
+    name: "HIFLD — Electric Substations (via ArcGIS Online \"HIFLD Legacy\" mirror)",
+    url: "https://services8.arcgis.com/JmsEp6kLWIAAV8tm/arcgis/rest/services/Transmission_Lines_and_Substations_WFL1/FeatureServer",
+    license: "Public (HIFLD / Oak Ridge National Laboratory)",
+    refreshFrequency: "Static extract mirrored from the legacy HIFLD Electric Substations dataset (last HIFLD refresh: 2025)",
+    methodology:
+      "Nationwide substation point locations queried by bounding box across all 8 voltage-tier sub-layers of the source service and merged; voltage range from the source's MAX_VOLT/MIN_VOLT attributes. Location only — not a statement of interconnection headroom or available capacity at that substation.",
+  },
 } satisfies Record<string, SourceMeta>;

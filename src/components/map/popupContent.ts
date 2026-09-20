@@ -28,6 +28,15 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
       ]);
     case "utility-territories":
       return wrap("Utility Territory", [["Utility", (props.Name as string) || "Unknown"]]);
+    case "electric-substations":
+      return wrap("Electric Substation", [
+        ["Name", (props.Name as string) || "Unnamed / unverified"],
+        ["County", (props.County as string) || "Unknown"],
+        ["Status", (props.Status as string) || "Unknown"],
+        ["Max voltage", props.MaxVoltKv ? `${props.MaxVoltKv} kV` : "Unknown"],
+        ["Lines", props.Lines != null ? String(props.Lines) : "Unknown"],
+        ["Owner", (props.Owner as string) || "Unknown"],
+      ]);
     case "hydrography-rivers":
     case "hydrography-waterbodies":
       return wrap("Hydrography", [["Name", (props.GNIS_Name as string) || "Unnamed"]]);

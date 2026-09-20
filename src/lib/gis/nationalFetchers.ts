@@ -307,6 +307,67 @@ export async function fetchHifldTransmissionLines(bbox: Bbox): Promise<FeatureCo
   return tagLinesWithCountyDensity(normalized, bbox);
 }
 
+interface HifldSubstationRaw {
+  NAME?: string;
+  CITY?: string;
+  STATE?: string;
+  COUNTY?: string;
+  TYPE?: string;
+  STATUS?: string;
+  LINES?: number;
+  MAX_VOLT?: number;
+  MIN_VOLT?: number;
+  OWNERNSHIP?: string;
+}
+
+/** The source service splits substations across 8 point sub-layers by voltage tier — see NATIONAL_SOURCES.hifldSubstations. */
+const HIFLD_SUBSTATION_SUBLAYER_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
+
+/**
+ * Nationwide HIFLD substation points, merged from all 8 voltage-tier sub-layers
+ * of the source service and normalized onto simple PascalCase property names
+ * (Name/City/State/County/Type/Status/Lines/MaxVoltKv/MinVoltKv/Owner) used by
+ * the map popup (popupContent.ts) and the power analysis engine (power.ts).
+ * A sub-layer query failure degrades to "no features from that tier" rather
+ * than failing the whole layer — most bboxes only touch one or two tiers anyway.
+ */
+export async function fetchHifldSubstations(bbox: Bbox): Promise<FeatureCollection<Geometry, Record<string, unknown>>> {
+  const results = await Promise.all(
+    HIFLD_SUBSTATION_SUBLAYER_IDS.map((id) =>
+      queryArcGisGeoJSON<HifldSubstationRaw>(
+        `${NATIONAL_SOURCES.hifldSubstations.url}/${id}`,
+        { bbox, outFields: "NAME,CITY,STATE,COUNTY,TYPE,STATUS,LINES,MAX_VOLT,MIN_VOLT,OWNERNSHIP" },
+        TTL.ONE_DAY
+      ).catch(() => ({ type: "FeatureCollection", features: [] }) as FeatureCollection<Geometry, HifldSubstationRaw>)
+    )
+  );
+  const features = results.flatMap((fc) =>
+    fc.features.map((f) => {
+      const p = f.properties ?? {};
+      // Source uses 0/negative sentinels for "unknown voltage" on this dataset too.
+      const maxVolt = typeof p.MAX_VOLT === "number" && p.MAX_VOLT > 0 ? p.MAX_VOLT : null;
+      const minVolt = typeof p.MIN_VOLT === "number" && p.MIN_VOLT > 0 ? p.MIN_VOLT : null;
+      return {
+        ...f,
+        properties: {
+          // Many legacy HIFLD substation records carry a placeholder "UNKNOWN<id>" name.
+          Name: p.NAME && !p.NAME.startsWith("UNKNOWN") ? p.NAME : null,
+          City: p.CITY || null,
+          State: p.STATE || null,
+          County: p.COUNTY || null,
+          Type: p.TYPE || null,
+          Status: p.STATUS || null,
+          Lines: p.LINES ?? null,
+          MaxVoltKv: maxVolt,
+          MinVoltKv: minVolt,
+          Owner: p.OWNERNSHIP || null,
+        },
+      };
+    })
+  );
+  return { type: "FeatureCollection", features };
+}
+
 /**
  * Service-territory layers contain nested/overlapping polygons (e.g. a municipal
  * utility inside a larger IOU territory). polygonContaining() returns the first

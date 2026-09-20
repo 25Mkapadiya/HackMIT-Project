@@ -17,6 +17,7 @@ export const RI_SOURCES = {
     methodology: "Hand-curated illustrative list of publicly reported Rhode Island data center/colocation activity. NOT exhaustive and NOT independently verified against parcel/operator records.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

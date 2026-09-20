@@ -112,6 +112,18 @@ export interface PowerAnalysis {
   nearest115kv: DistanceResult & { voltageKv: number | null };
   nearest230kv: DistanceResult & { voltageKv: number | null };
   nearest500kv: DistanceResult & { voltageKv: number | null };
+  /**
+   * Nearest known electric substation (HIFLD legacy nationwide extract — see
+   * NATIONAL_SOURCES.hifldSubstations). Location only, not a statement of
+   * interconnection headroom — see gridCapacity, which stays UNKNOWN regardless.
+   */
+  nearestSubstation: DistanceResult & {
+    maxVoltageKv: number | null;
+    lineCount: number | null;
+    /** Substation coordinates, when found — lets the map draw a proximity connector line to the site. */
+    lng: number | null;
+    lat: number | null;
+  };
   utilityTerritory: Metric<string | null>;
   nearbyGeneration: Metric<
     { totalMw: number; count: number; plants: { name: string; mw: number; fuel: string; miles: number }[] } | null
