@@ -19,10 +19,11 @@ const EFFICIENCY_SOURCE: SourceMeta = {
 /**
  * Estimates this scenario's PUE from published industry benchmarks, adjusted
  * for the site's local population-density "grid demand pressure" (already
- * computed in power.ts) and a water-stress cooling constraint. Runs after
- * power.ts (reuses its density lookup — no extra Census geocoder call) and
- * before water.ts (which needs this estimate for its consumption/withdrawal
- * figures instead of a flat assumed PUE).
+ * computed in power.ts) and a water-stress cooling constraint. Only depends
+ * on `power` (reuses its density lookup — no extra Census geocoder call);
+ * water.ts computes its own technology-specific water model independently
+ * and does not need this estimate, so the two can run concurrently (see
+ * runScenarioAnalysis in analysis/index.ts).
  */
 export async function computeEfficiencyAnalysis(
   scenario: ScenarioConfig,

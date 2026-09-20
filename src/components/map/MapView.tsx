@@ -183,6 +183,11 @@ export default function MapView() {
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const noiseHoverPopupRef = useRef<maplibregl.Popup | null>(null);
   const usBoundaryRef = useRef<FeatureCollection<Polygon | MultiPolygon> | null>(null);
+  // Set while any proposed-site analysis is in flight, so the background
+  // preload (below) yields to it — a user who just clicked "Run Site
+  // Analysis" should never be stuck waiting behind dozens of passive,
+  // nobody-asked-for-them-yet background layer prefetches.
+  const analysisInFlightRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
   const layerVisibility = useAppStore((s) => s.layerVisibility);
@@ -194,6 +199,8 @@ export default function MapView() {
   const showAllStates = useAppStore((s) => s.showAllStates);
   const addScenario = useAppStore((s) => s.addScenario);
   const setActiveScenario = useAppStore((s) => s.setActiveScenario);
+
+  analysisInFlightRef.current = Object.values(analysisByScenario).some((a) => a.status === "loading");
 
   // ---- preload implemented-state GIS data (once) ----
   // Start network work immediately on mount, before the map is ready. This keeps
@@ -235,18 +242,26 @@ export default function MapView() {
     }
 
     preloadPromiseRef.current = (async () => {
-      // Higher than the old value of 8 — these all hit our own same-origin API
-      // route (not 49 different upstream hosts), so browser/HTTP2 multiplexing
-      // handles the fan-out fine, and more in-flight requests means the Show
-      // All reveal wave finds more states already cached by the time it reaches them.
-      const workerCount = Math.min(16, tasks.length);
+      // Was 16: these all hit our own same-origin API route (not 49 upstream
+      // hosts), so a wider pool does help the Show All reveal wave find more
+      // states already cached. But this whole pool runs continuously for the
+      // entire session from page load (there's no cancellation on unmount or
+      // on leaving Show All), and at 16 it could saturate a single Node
+      // process badly enough to starve a user-initiated request that lands
+      // mid-preload (observed: a fresh "Run Site Analysis" click stalling
+      // 90s+ behind ~350 queued background layer fetches). 8 is gentler on
+      // the server while still keeping Show All feeling fast in practice.
+      const workerCount = Math.min(8, tasks.length);
       let nextTask = 0;
       const workers = Array.from({ length: workerCount }, async () => {
         while (nextTask < tasks.length) {
-          // A Show All reveal wave is actively playing — its own timers need
-          // the main thread free of large JSON-parsing bursts from preload
-          // responses landing all at once. Yield until it's done, then resume.
-          while (preloadPausedRef.current) {
+          // Yield while a Show All reveal wave is actively playing (its own
+          // timers need the main thread free of large JSON-parsing bursts
+          // from preload responses landing all at once) or while the user
+          // is waiting on a site analysis they explicitly asked for — a
+          // user-initiated action always gets priority over passive,
+          // nobody-asked-for-it-yet background prefetching.
+          while (preloadPausedRef.current || analysisInFlightRef.current) {
             await new Promise((resolve) => setTimeout(resolve, 120));
           }
           const task = tasks[nextTask++];

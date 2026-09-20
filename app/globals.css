@@ -68,6 +68,23 @@ body {
   padding: 4px 8px !important;
 }
 
+/* Respect prefers-reduced-motion: shrink every CSS animation/transition to
+   effectively instant rather than removing them, so elements still reach
+   their correct final state (nothing in the app depends on animation
+   timing for correctness — e.g. the Show All reveal's stagger is driven by
+   JS setTimeout, not by this duration) while eliminating nonessential
+   motion (fade-ins, slide-ups, scroll-reveal on /learn, etc). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer utilities {
   .glass-panel {
     background: linear-gradient(180deg, rgba(19, 25, 36, 0.92) 0%, rgba(15, 20, 27, 0.92) 100%);

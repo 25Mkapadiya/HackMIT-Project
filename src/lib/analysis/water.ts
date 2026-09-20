@@ -42,11 +42,14 @@ function deriveWaterStress(
 /**
  * Lightweight water-stress-only lookup (drought + nearby water-right density),
  * split out from the full water analysis so efficiency.ts can factor water
- * stress into its estimated-PUE model without waiting on (or duplicating) the
- * full water analysis, which itself needs that estimated PUE for its
- * consumption/withdrawal figures. Re-fetches the same drought/rights data
- * computeWaterAnalysis fetches — both hit the same per-bbox ArcGIS cache
- * entry (see arcgis.ts), so this never costs a second network round trip.
+ * stress into its estimated-PUE model without waiting on the full water
+ * analysis. Re-fetches the same drought/rights data computeWaterAnalysis
+ * fetches; both hit the same per-bbox ArcGIS URL cache key (see arcgis.ts),
+ * so once either call has completed once for a given location, the other
+ * resolves from cache. The two calls do run concurrently as of
+ * runScenarioAnalysis (analysis/index.ts), so on a genuinely new location
+ * they can occasionally both miss the cache and each fire one real request
+ * — a small, bounded, same-process duplicate, not a correctness issue.
  */
 export async function computeWaterStressContext(
   scenario: ScenarioConfig

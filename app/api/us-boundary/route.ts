@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import usStates from "../../../reference/nationwide-advisor/public/data/us-states.json";
+import usStates from "@/lib/gis/data/usStates.json";
 
 export async function GET() {
   return NextResponse.json(usStates, {
