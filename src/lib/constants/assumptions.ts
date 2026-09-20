@@ -80,6 +80,19 @@ export const COOLING_TOWER_CYCLES_OF_CONCENTRATION = 4;;
 export const COOLING_TOWER_MAKEUP_GAL_PER_TON_DAY_AT_4_COC = 49.3;
 
 /**
+ * Real-world operator WUE benchmarks used for annual-average evaporative /
+ * mixed-cooling operating estimates. Microsoft reports FY25 Americas WUE of
+ * 0.34 L/kWh; Meta reported 0.19 L/kWh for 2024; Google reported 1.15 L/kWh
+ * Category 2 for 2023/2024. We use the Microsoft Americas value as the primary
+ * US operating benchmark and retain Meta/Google as a transparent observed range.
+ */
+export const EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH = {
+  primary: 0.34,
+  low: 0.19,
+  high: 1.15,
+};
+
+/**
  * Closed chilled-water loop planning assumptions.
  * Johnson Controls recommends 8-10 gal/ton system water volume for variable
  * primary flow on its YVAM air-cooled chillers, and 5-8 gal/ton is preferred
