@@ -3,7 +3,7 @@ import type { ScenarioConfig, WaterAnalysis } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, featuresWithinRadius, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
-import { COOLING_TECH_TO_WUE_KEY, GALLONS_PER_LITER, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
+import { COOLING_TECH_TO_WUE_KEY, COOLING_TOWER_CYCLES_OF_CONCENTRATION, GALLONS_PER_LITER, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
 
 /** D0 (abnormally dry) through D4 (exceptional drought) — US Drought Monitor classification labels. */
 const USDM_LABELS = [
@@ -66,7 +66,7 @@ export async function computeWaterStressContext(
   return { waterStress };
 }
 
-export async function computeWaterAnalysis(scenario: ScenarioConfig, estimatedPue: number): Promise<WaterAnalysis> {
+export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<WaterAnalysis> {
   const { lng, lat, mwLoad, coolingTechnology, stateId } = scenario;
   const bundle = getStateGisBundle(stateId);
   const hasWaterRightsLayer = Boolean(bundle.fetchers["water-diversions"]);
@@ -97,29 +97,42 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig, estimatedPu
   const wueKey = COOLING_TECH_TO_WUE_KEY[coolingTechnology] ?? "us_average";
   const wue = WUE_L_PER_KWH[wueKey] ?? WUE_L_PER_KWH.us_average;
 
-  const facilityLoadKw = mwLoad * 1000 * estimatedPue;
-  const kwhPerDay = facilityLoadKw * 24;
-  const litersPerDay = kwhPerDay * wue.value;
-  const gallonsPerDay = litersPerDay * GALLONS_PER_LITER;
-  const isOpenLoop = scenario.loopType === "open_loop";
-  const withdrawalGalPerDay = isOpenLoop ? gallonsPerDay * 2.2 : gallonsPerDay * 1.1;
+  // WUE is site water use per kWh of IT-equipment energy, not total facility energy.
+  // Multiplying by PUE here would overstate water use by the PUE factor.
+  const itLoadKw = mwLoad * 1000;
+  const itEnergyKwhPerDay = itLoadKw * 24;
+  const siteWaterUseLitersPerDay = itEnergyKwhPerDay * wue.value;
+  const withdrawalGalPerDay = siteWaterUseLitersPerDay * GALLONS_PER_LITER;
+
+  // For evaporative towers, a portion of make-up water exits as blowdown.
+  // DOE defines cycles of concentration approximately as make-up / blowdown.
+  const isEvaporative = coolingTechnology === "cooling_tower_evaporative";
+  const blowdownGalPerDay = isEvaporative
+    ? withdrawalGalPerDay / COOLING_TOWER_CYCLES_OF_CONCENTRATION
+    : 0;
+  const consumptionGalPerDay = isEvaporative
+    ? Math.max(0, withdrawalGalPerDay - blowdownGalPerDay)
+    : withdrawalGalPerDay;
 
   return {
     estimatedConsumptionGalPerDay: {
       label: "Estimated water consumption",
-      value: Math.round(gallonsPerDay),
+      value: Math.round(consumptionGalPerDay),
       unit: "gal/day",
       confidence: "estimated",
       source: {
         id: "wue-model",
         name: "WUE-based cooling water model",
         url: "",
-        methodology: `Estimated PUE ${estimatedPue} × ${mwLoad} MW IT load × 24h × ${wue.value} L/kWh (${wue.label}), converted to gallons.`,
+        methodology: isEvaporative
+          ? `${mwLoad} MW IT load × 24h × ${wue.value} L/kWh site WUE (${wue.label}), converted to gallons, then subtracting modeled blowdown at ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration to estimate consumptive loss.`
+          : `${mwLoad} MW IT load × 24h × ${wue.value} L/kWh site WUE (${wue.label}), converted to gallons.`,
       },
       caveats: [
         "Model estimate from published WUE reference coefficients, not a site-specific engineering study.",
-        "Uses this scenario's modeled PUE estimate (see the Efficiency section), itself a directional industry-benchmark model, not a measured figure.",
-        "Actual consumption depends on climate, chiller design, and operating setpoints.",
+        isEvaporative
+          ? `Cooling-tower consumption assumes ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration; actual cycles depend on make-up water chemistry and treatment.`
+          : "Routine cooling-process water only; domestic water, humidification, fire systems, initial loop fill, and maintenance losses are excluded.",
       ],
     },
     estimatedWithdrawalGalPerDay: {
@@ -131,9 +144,11 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig, estimatedPu
         id: "wue-model",
         name: "WUE-based cooling water model",
         url: "",
-        methodology: "Withdrawal approximated as a multiple of consumption depending on open- vs closed-loop design.",
+        methodology: "Site water use is calculated directly from WUE × IT-equipment energy. For evaporative cooling this represents cooling-tower make-up water; dry-rejection technologies are modeled with effectively zero routine cooling-process draw.",
       },
-      caveats: ["Withdrawal exceeds consumption because not all withdrawn water is evaporated/lost."],
+      caveats: isEvaporative
+        ? [`At ${COOLING_TOWER_CYCLES_OF_CONCENTRATION} cycles of concentration, roughly ${Math.round(100 / COOLING_TOWER_CYCLES_OF_CONCENTRATION)}% of make-up water is modeled as blowdown rather than consumptive loss.`]
+        : ["Routine cooling-process water only; this is not total facility potable-water demand."],
     },
     nearestWaterBody: {
       distanceMiles: nearestWater.distanceMiles,
