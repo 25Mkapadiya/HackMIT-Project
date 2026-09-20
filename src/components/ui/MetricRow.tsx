@@ -19,12 +19,12 @@ function formatValue(v: unknown, unit?: string): string {
 export default function MetricRow<T>({ metric }: { metric: Metric<T> }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2 border-b border-base-800/70 last:border-0">
-      <div className="flex items-center gap-1.5 text-[12px] text-ink-300 pt-0.5">
-        <span>{metric.label}</span>
+      <div className="flex items-center gap-1.5 text-[12px] text-ink-300 pt-0.5 shrink-0 max-w-[45%]">
+        <span className="break-words">{metric.label}</span>
         <ProvenanceTag source={metric.source} caveats={metric.caveats} methodologyNote={metric.methodologyNote} />
       </div>
-      <div className="text-right shrink-0">
-        <div className="text-[13px] font-semibold text-ink-100 font-mono">{formatValue(metric.value, metric.unit)}</div>
+      <div className="text-right min-w-0 flex-1">
+        <div className="text-[13px] font-semibold text-ink-100 font-mono break-words whitespace-normal">{formatValue(metric.value, metric.unit)}</div>
       </div>
     </div>
   );
