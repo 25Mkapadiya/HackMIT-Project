@@ -16,6 +16,8 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
 
   switch (layerId) {
     case "transmission-lines":
+    case "transmission-lines-high":
+    case "transmission-lines-low":
       return wrap("Transmission Line", [
         ["Line", (props.OperatingLineNm as string) || (props.XRefCd as string) || "Unnamed"],
         ["Voltage", props.VoltageMeas ? `${props.VoltageMeas} kV` : "Unknown"],

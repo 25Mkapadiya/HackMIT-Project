@@ -3,9 +3,9 @@ import { IL_SOURCES } from "./sources";
 
 export const IL_LAYERS: LayerDefinition[] = [
   {
-    id: "transmission-lines",
-    name: "Electric Power Transmission Lines",
-    shortName: "Transmission",
+    id: "transmission-lines-high",
+    name: "High-Voltage Transmission Lines (≥230 kV)",
+    shortName: "Transmission (High)",
     category: "power",
     geometryType: "line",
     source: IL_SOURCES.hifldTransmission,
@@ -13,13 +13,24 @@ export const IL_LAYERS: LayerDefinition[] = [
     description:
       "HIFLD statewide transmission geometry with voltage/ownership attributes. Illinois contains extensive high-voltage infrastructure and spans both PJM and MISO planning regions.",
     defaultVisible: true,
-    endpoint: "/api/gis/transmission-lines",
-    legend: [
-      { label: "500 kV+", color: "#ff5470", swatch: "line", lineWidth: 3 },
-      { label: "230–499 kV", color: "#f2b93b", swatch: "line", lineWidth: 2.5 },
-      { label: "115–229 kV", color: "#f2d98b", swatch: "line", lineWidth: 2 },
-      { label: "< 115 kV / unknown", color: "#8fa3bf", swatch: "line", lineWidth: 1.5 },
-    ],
+    endpoint: "/api/gis/transmission-lines-high",
+    color: "#ff5470",
+    legend: [{ label: "230 kV and above", color: "#ff5470", swatch: "line", lineWidth: 3 }],
+  },
+  {
+    id: "transmission-lines-low",
+    name: "Low-Voltage Transmission Lines (<230 kV)",
+    shortName: "Transmission (Low)",
+    category: "power",
+    geometryType: "line",
+    source: IL_SOURCES.hifldTransmission,
+    confidence: "fact",
+    description:
+      "HIFLD statewide transmission geometry with voltage/ownership attributes. Illinois contains extensive high-voltage infrastructure and spans both PJM and MISO planning regions.",
+    defaultVisible: true,
+    endpoint: "/api/gis/transmission-lines-low",
+    color: "#f2c94c",
+    legend: [{ label: "Below 230 kV / unknown", color: "#f2c94c", swatch: "line", lineWidth: 1.8 }],
   },
   {
     id: "utility-territories",

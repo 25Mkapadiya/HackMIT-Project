@@ -4,6 +4,7 @@ import { cached, TTL } from "@/lib/cache/memoryCache";
 import * as turf from "@turf/turf";
 import { NATIONAL_SOURCES } from "./nationalSources";
 import countyPopulationDensityData from "./data/countyPopulationDensity.json";
+import { VOLTAGE_TIERS } from "@/lib/constants/assumptions";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -305,6 +306,34 @@ export async function fetchHifldTransmissionLines(bbox: Bbox): Promise<FeatureCo
     }),
   };
   return tagLinesWithCountyDensity(normalized, bbox);
+}
+
+/**
+ * Splits a transmission-line FeatureCollection into "high" (>= VOLTAGE_TIERS.high,
+ * i.e. 230kV+) and "low" (everything else, including unknown/unclassified voltage)
+ * tiers — backs the two separately-toggleable map layers (see layerStyles.ts /
+ * layers.ts), while power.ts still fetches the unfiltered "transmission-lines" set
+ * for its nearest-115/230/500kV distance calculations.
+ */
+export function filterTransmissionByVoltageTier<P extends { VoltageMeas?: number | null }>(
+  fc: FeatureCollection<Geometry, P>,
+  tier: "high" | "low"
+): FeatureCollection<Geometry, P> {
+  return {
+    type: "FeatureCollection",
+    features: fc.features.filter((f) => {
+      const kv = f.properties?.VoltageMeas ?? 0;
+      return tier === "high" ? kv >= VOLTAGE_TIERS.high : kv < VOLTAGE_TIERS.high;
+    }),
+  };
+}
+
+export async function fetchHifldTransmissionLinesHigh(bbox: Bbox) {
+  return filterTransmissionByVoltageTier(await fetchHifldTransmissionLines(bbox), "high");
+}
+
+export async function fetchHifldTransmissionLinesLow(bbox: Bbox) {
+  return filterTransmissionByVoltageTier(await fetchHifldTransmissionLines(bbox), "low");
 }
 
 interface HifldSubstationRaw {

@@ -11,6 +11,8 @@ import {
   fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
   fetchHifldTransmissionLines,
+  fetchHifldTransmissionLinesHigh,
+  fetchHifldTransmissionLinesLow,
   fetchHifldUtilityTerritories,
   fetchHifldSubstations,
   fetchUsDroughtMonitor,
@@ -49,7 +51,11 @@ export function buildStandardStateLayerFetchers(
   }
 
   const rawFetchers: Record<string, Fetcher> = {
+    // Kept for the analysis engine's nearest-115/230/500kV distance calcs
+    // (power.ts) — the map itself now shows the two split layers below.
     "transmission-lines": fetchHifldTransmissionLines,
+    "transmission-lines-high": fetchHifldTransmissionLinesHigh,
+    "transmission-lines-low": fetchHifldTransmissionLinesLow,
     "utility-territories": fetchHifldUtilityTerritories,
     "electric-substations": fetchHifldSubstations,
     "hydrography-rivers": fetchNhdFlowline,

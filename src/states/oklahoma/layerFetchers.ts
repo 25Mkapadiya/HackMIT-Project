@@ -10,6 +10,8 @@ import {
   fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
   fetchHifldTransmissionLines,
+  fetchHifldTransmissionLinesHigh,
+  fetchHifldTransmissionLinesLow,
   fetchHifldUtilityTerritories,
   fetchHifldSubstations,
   fetchUsDroughtMonitor,
@@ -54,6 +56,8 @@ async function fetchDataCenters(bbox: Bbox): Promise<FeatureCollection<Point>> {
 
 const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = {
   "transmission-lines": fetchHifldTransmissionLines,
+  "transmission-lines-high": fetchHifldTransmissionLinesHigh,
+  "transmission-lines-low": fetchHifldTransmissionLinesLow,
   "utility-territories": fetchHifldUtilityTerritories,
   "electric-substations": fetchHifldSubstations,
   "hydrography-rivers": fetchNhdFlowline,

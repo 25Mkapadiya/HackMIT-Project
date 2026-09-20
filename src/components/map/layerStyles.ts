@@ -22,34 +22,17 @@ export function buildLayerSpecs(
   const baseColor = layer.color ?? "#8fa3bf";
   const mapLayerId = idPrefix ? `${idPrefix}-${layer.id}` : layer.id;
 
-  if (layer.id === "transmission-lines") {
-    const voltageColor: DataDrivenPropertyValueSpecification<string> = [
-      "step",
-      ["coalesce", ["get", "VoltageMeas"], 0],
-      "#8fa3bf",
-      115,
-      "#f2d98b",
-      230,
-      "#f2b93b",
-      500,
-      "#ff5470",
-    ];
-    const voltageWidth: DataDrivenPropertyValueSpecification<number> = [
-      "step",
-      ["coalesce", ["get", "VoltageMeas"], 0],
-      1.3,
-      115,
-      1.8,
-      230,
-      2.4,
-      500,
-      3.2,
-    ];
-    // Soft blurred glow behind the voltage-colored line, present only where the
-    // line runs through a county with meaningful population density (below the
-    // "low" tier it's fully transparent, so most rural transmission draws with
-    // no glow at all — this is additive context on the existing line, not a
-    // second competing layer, which is what keeps it from being distracting.
+  // Transmission lines are split into two independently-toggleable layers —
+  // "high" (>=230kV, red) and "low" (<230kV / unknown, yellow) — see
+  // filterTransmissionByVoltageTier in nationalFetchers.ts. Each is now a
+  // single solid color/width per layer.color rather than a voltage-stepped
+  // ramp within one layer, since the split already carries that distinction.
+  if (layer.id === "transmission-lines-high" || layer.id === "transmission-lines-low") {
+    const lineWidth = layer.id === "transmission-lines-high" ? 2.8 : 1.6;
+    // Soft blurred glow behind the line, present only where it runs through a
+    // county with meaningful population density (below the "low" tier it's
+    // fully transparent, so most rural transmission draws with no glow at
+    // all) — additive context on the existing line, not a second competing layer.
     const pressureHaloColor: DataDrivenPropertyValueSpecification<string> = [
       "step",
       ["coalesce", ["get", "PopulationDensityPerSqMi"], -1],
@@ -75,7 +58,7 @@ export function buildLayerSpecs(
         paint: {
           "line-color": pressureHaloColor,
           "line-opacity": pressureHaloOpacity,
-          "line-width": ["+", voltageWidth, 5],
+          "line-width": lineWidth + 5,
           "line-blur": 3,
         },
       },
@@ -84,8 +67,8 @@ export function buildLayerSpecs(
         type: "line",
         source: sourceId,
         paint: {
-          "line-color": voltageColor,
-          "line-width": voltageWidth,
+          "line-color": baseColor,
+          "line-width": lineWidth,
           "line-opacity": 0.9,
         },
       },
@@ -222,7 +205,6 @@ export function buildLayerSpecs(
 
 export function interactiveLayerIds(layer: LayerDefinition, idPrefix = ""): string[] {
   const mapLayerId = idPrefix ? `${idPrefix}-${layer.id}` : layer.id;
-  if (layer.id === "transmission-lines") return [`${mapLayerId}-line`];
   if (layer.id === "flood-zones") return [`${mapLayerId}-fill`];
   switch (layer.geometryType) {
     case "line":

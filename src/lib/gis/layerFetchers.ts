@@ -13,6 +13,7 @@ import {
   fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
   fetchHifldSubstations,
+  filterTransmissionByVoltageTier,
   tagLinesWithCountyDensity,
 } from "./nationalFetchers";
 
@@ -39,12 +40,27 @@ function generalizationFor(bbox: Bbox): number {
 // nationwide HIFLD extract) — kept as-is rather than routed through the
 // shared national transmission fetcher other states use.
 
+interface WaTransmissionProps {
+  XRefCd?: string;
+  OperatingLineNm?: string;
+  VoltageMeas?: number;
+  [key: string]: unknown;
+}
+
 async function fetchTransmissionLines(bbox: Bbox) {
-  const fc = await queryArcGisGeoJSON(WA_SOURCES.bpaTransmission.url, {
+  const fc = await queryArcGisGeoJSON<WaTransmissionProps>(WA_SOURCES.bpaTransmission.url, {
     bbox,
     outFields: "XRefCd,OperatingLineNm,VoltageMeas",
   });
   return tagLinesWithCountyDensity(fc, bbox);
+}
+
+async function fetchTransmissionLinesHigh(bbox: Bbox) {
+  return filterTransmissionByVoltageTier(await fetchTransmissionLines(bbox), "high");
+}
+
+async function fetchTransmissionLinesLow(bbox: Bbox) {
+  return filterTransmissionByVoltageTier(await fetchTransmissionLines(bbox), "low");
 }
 
 async function fetchUtilityTerritories(bbox: Bbox) {
@@ -94,6 +110,8 @@ async function fetchDataCenters(bbox: Bbox): Promise<FeatureCollection<Point>> {
 
 const RAW_FETCHERS: Record<string, (bbox: Bbox) => Promise<FeatureCollection>> = {
   "transmission-lines": fetchTransmissionLines,
+  "transmission-lines-high": fetchTransmissionLinesHigh,
+  "transmission-lines-low": fetchTransmissionLinesLow,
   "utility-territories": fetchUtilityTerritories,
   "electric-substations": fetchHifldSubstations,
   "hydrography-rivers": fetchNhdFlowline,
