@@ -57,12 +57,21 @@ function VarSelect({ label, value, onChange }: { label: string; value: string; o
 function scenarioValues(
   s: ScenarioConfig,
   analysisPue: number | null,
-  analysisConsumptionGalPerDay: number | null
+  analysisConsumptionGalPerDay: number | null,
+  analysisEvaporativeWueLPerKwh: number | null
 ): Record<string, number> {
   // Prefer the analysis's modeled PUE once it has run; otherwise the cooling technology's base PUE.
   const pue = analysisPue ?? BASE_PUE_BY_COOLING_TECH[s.coolingTechnology]?.value ?? 1.4;
   const wueKey = COOLING_TECH_TO_WUE_KEY[s.coolingTechnology] ?? "us_average";
-  const wue = WUE_L_PER_KWH[wueKey]?.value ?? WUE_L_PER_KWH.us_average.value;
+  // The analysis's own WUE only shares the L/kWh unit with this chart's "wue" axis for
+  // evaporative cooling (see water.ts's wueAssumption — closed chilled water reports a
+  // % makeup/yr, not L/kWh); other technologies keep the static per-technology reference,
+  // which is already correctly 0 for dry heat rejection and for closed chilled water
+  // (neither evaporates cooling water, so their true WUE is 0 regardless of climate).
+  const wue =
+    analysisEvaporativeWueLPerKwh != null
+      ? analysisEvaporativeWueLPerKwh
+      : (WUE_L_PER_KWH[wueKey]?.value ?? WUE_L_PER_KWH.us_average.value);
   const edcKwh = s.mwLoad * 1000 * pue * 8760;
   // Prefer the analysis's own water model once it has run — it already reflects the
   // site's actual climate (see water.ts's climateWaterAdjustment), cooling technology's
@@ -104,7 +113,8 @@ export default function GraphPanel() {
       const v = scenarioValues(
         sc,
         ready ? a.data.efficiency.estimatedPue.value : null,
-        ready ? a.data.water.estimatedConsumptionGalPerDay.value : null
+        ready ? a.data.water.estimatedConsumptionGalPerDay.value : null,
+        ready && sc.coolingTechnology === "cooling_tower_evaporative" ? a.data.water.wueAssumption.value : null
       );
       const x = v[xKey];
       const y = v[yKey];
