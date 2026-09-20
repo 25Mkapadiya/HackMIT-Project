@@ -73,9 +73,10 @@ export const COOLING_TOWER_CYCLES_OF_CONCENTRATION = 4;
 
 /**
  * Closed chilled-water loop planning assumptions.
- * Carrier documents a 6 gal/ton example loop; Johnson Controls recommends
- * 8-10 gal/ton for one air-cooled chiller family. We use 8 gal/ton as a
- * transparent midpoint planning value, not a universal design requirement.
+ * Johnson Controls recommends 8-10 gal/ton system water volume for variable
+ * primary flow on its YVAM air-cooled chillers, and 5-8 gal/ton is preferred
+ * for constant-flow YVFA applications. We use 8 gal/ton as a conservative
+ * planning value within those published ranges, not a universal requirement.
  */
 export const CLOSED_LOOP_GALLONS_PER_TON = 8;
 
