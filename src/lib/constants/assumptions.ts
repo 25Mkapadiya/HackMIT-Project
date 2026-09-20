@@ -10,38 +10,45 @@
 export const WUE_L_PER_KWH = {
   us_average: {
     value: 1.8,
-    label: "US data center average",
-    description: "Commonly cited industry-average WUE for evaporative-cooled US data centers.",
+    label: "Evaporative-cooled reference",
+    description:
+      "Reference site WUE for an evaporative-cooled data center. WUE is site water use divided by IT-equipment energy, so it must be applied to IT kWh rather than PUE-adjusted facility kWh.",
   },
   best_in_class: {
     value: 0.19,
-    label: "Best-in-class (closed-loop / free air)",
-    description: "Reference figure for highly efficient closed-loop or free-cooling designs.",
+    label: "Low-water reference",
+    description:
+      "Low-water industry reference retained for comparison; not used as the default for dry heat-rejection technologies.",
   },
   air_cooled_dx: {
-    value: 0.2,
-    label: "Air-cooled (DX / no evaporative water use)",
-    description: "Direct-expansion air cooling uses effectively no site water for heat rejection.",
+    value: 0,
+    label: "Air-cooled DX / dry heat rejection",
+    description:
+      "Routine cooling-process site water use is modeled as effectively zero because heat is rejected directly to air without an evaporative cooling tower. Domestic, humidification, fire-system, and one-time fill water are outside this cooling model.",
   },
   chilled_water_air_cooled_chiller: {
-    value: 0.5,
-    label: "Chilled water, air-cooled chiller",
-    description: "Closed chilled-water loop rejecting heat via dry air-cooled chillers.",
+    value: 0,
+    label: "Chilled water + air-cooled chiller",
+    description:
+      "The chilled-water loop is closed and heat is rejected by dry air-cooled chillers, so routine cooling-process make-up water is modeled as effectively zero. One-time loop fill and non-cooling facility water are excluded.",
   },
   cooling_tower_evaporative: {
     value: 1.8,
-    label: "Open cooling tower (evaporative)",
-    description: "Conventional evaporative cooling tower — highest site water consumption.",
+    label: "Evaporative cooling tower",
+    description:
+      "Site-WUE reference for conventional evaporative cooling. Applied to IT-equipment energy, consistent with the WUE definition.",
   },
   closed_loop_liquid: {
-    value: 0.4,
-    label: "Closed-loop liquid / direct-to-chip",
-    description: "Closed liquid loop with dry heat rejection; minimal evaporative losses.",
+    value: 0,
+    label: "Closed-loop liquid / direct-to-chip with dry rejection",
+    description:
+      "A sealed liquid loop with dry heat rejection is modeled as having effectively zero routine cooling-process make-up water. Initial fill, maintenance losses, and non-cooling facility water are excluded.",
   },
   immersion: {
-    value: 0.15,
-    label: "Immersion cooling",
-    description: "Dielectric immersion cooling with dry heat rejection.",
+    value: 0,
+    label: "Immersion cooling with dry rejection",
+    description:
+      "Immersion cooling paired with dry heat rejection is modeled as having effectively zero routine cooling-process site water use. Non-cooling facility water is excluded.",
   },
 } satisfies Record<string, { value: number; label: string; description: string }>;
 
@@ -55,6 +62,14 @@ export const COOLING_TECH_TO_WUE_KEY: Record<string, keyof typeof WUE_L_PER_KWH>
 };
 
 export const GALLONS_PER_LITER = 0.264172;
+
+/**
+ * Default cooling-tower cycles of concentration used to split site water use
+ * (make-up / withdrawal) into consumptive losses versus blowdown discharge.
+ * DOE notes many systems operate around 2–4 cycles, while 6+ may be achievable.
+ * Four cycles is a transparent, middle-of-typical-range planning assumption.
+ */
+export const COOLING_TOWER_CYCLES_OF_CONCENTRATION = 4;
 
 /** Acreage per MW of IT load — wide industry range; used only as a rough footprint estimate. */
 export const ACREAGE_PER_MW = {
