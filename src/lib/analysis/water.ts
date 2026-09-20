@@ -70,6 +70,37 @@ export async function computeWaterStressContext(
   return { waterStress };
 }
 
+/**
+ * Pure cooling-water consumption model, factored out of computeWaterAnalysis so
+ * GraphPanel can use the exact same math for its pre-analysis preview (before a
+ * scenario's async analysis has resolved) instead of a separately-maintained
+ * approximation. GraphPanel calls this with climateMultiplier = 1 (its preview
+ * has no climate lookup yet), matching computeWaterAnalysis's own "no climate
+ * data available" fallback below.
+ */
+export function estimateCoolingConsumptionGalPerDay(
+  mwLoad: number,
+  coolingTechnology: ScenarioConfig["coolingTechnology"],
+  climateMultiplier: number
+): number {
+  const isEvaporative = coolingTechnology === "cooling_tower_evaporative";
+  const isClosedChilledWater = coolingTechnology === "chilled_water_air_cooled_chiller";
+
+  const itLoadKw = mwLoad * 1000;
+  const refrigerationTons = itLoadKw / KW_PER_REFRIGERATION_TON;
+
+  const closedLoopVolumeGal = refrigerationTons * CLOSED_LOOP_GALLONS_PER_TON;
+  const closedLoopRoutineMakeupGalPerYear = closedLoopVolumeGal * CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * climateMultiplier;
+  const closedLoopRefreshGalPerYear = closedLoopVolumeGal / CLOSED_LOOP_REFRESH_INTERVAL_YEARS;
+  const closedLoopAnnualizedGalPerDay = (closedLoopRoutineMakeupGalPerYear + closedLoopRefreshGalPerYear) / 365;
+
+  const itEnergyKwhPerDay = itLoadKw * 24;
+  const evaporativeConsumptionGalPerDay =
+    itEnergyKwhPerDay * EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary * GALLONS_PER_LITER * climateMultiplier;
+
+  return isEvaporative ? evaporativeConsumptionGalPerDay : isClosedChilledWater ? closedLoopAnnualizedGalPerDay : 0;
+}
+
 export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<WaterAnalysis> {
   const { lng, lat, mwLoad, coolingTechnology, stateId } = scenario;
   const bundle = getStateGisBundle(stateId);
@@ -117,12 +148,6 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   // climate; the scheduled full-loop refresh is a fixed maintenance interval,
   // not a climate-driven draw, so it's left unscaled.
   const closedLoopVolumeGal = refrigerationTons * CLOSED_LOOP_GALLONS_PER_TON;
-  const closedLoopRoutineMakeupGalPerYear =
-    closedLoopVolumeGal * CLOSED_LOOP_ANNUAL_MAKEUP_FRACTION * climateAdjustment.multiplier;
-  const closedLoopRefreshGalPerYear =
-    closedLoopVolumeGal / CLOSED_LOOP_REFRESH_INTERVAL_YEARS;
-  const closedLoopAnnualizedGalPerDay =
-    (closedLoopRoutineMakeupGalPerYear + closedLoopRefreshGalPerYear) / 365;
 
   // Annual-average evaporative operating estimate uses an empirical US
   // operator benchmark rather than assuming the cooling tower is at full
@@ -131,12 +156,9 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   // fleet's climates, so it's scaled by this site's own cooling-degree-day
   // burden relative to the national reference (see climate.ts) rather than
   // applied as one flat nationwide number.
-  const itEnergyKwhPerDay = itLoadKw * 24;
-  const evaporativeConsumptionGalPerDay =
-    itEnergyKwhPerDay *
-    EMPIRICAL_EVAPORATIVE_WUE_L_PER_KWH.primary *
-    GALLONS_PER_LITER *
-    climateAdjustment.multiplier;
+  const consumptionGalPerDay = estimateCoolingConsumptionGalPerDay(mwLoad, coolingTechnology, climateAdjustment.multiplier);
+  const evaporativeConsumptionGalPerDay = consumptionGalPerDay;
+  const closedLoopAnnualizedGalPerDay = consumptionGalPerDay;
 
   // Keep the DOE tower calculation as a transparent peak/design upper bound,
   // scaled by the same climate multiplier.
@@ -153,12 +175,6 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
   // evaporate no cooling water in this model; routine cooling-process use is ~0.
   const withdrawalGalPerDay = isEvaporative
     ? evaporativeMakeupGalPerDay
-    : isClosedChilledWater
-      ? closedLoopAnnualizedGalPerDay
-      : 0;
-
-  const consumptionGalPerDay = isEvaporative
-    ? evaporativeConsumptionGalPerDay
     : isClosedChilledWater
       ? closedLoopAnnualizedGalPerDay
       : 0;

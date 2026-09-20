@@ -5,6 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import type { ScenarioConfig } from "@/lib/types";
 import DraggablePanel from "@/components/ui/DraggablePanel";
 import { BASE_PUE_BY_COOLING_TECH, COOLING_TECH_TO_WUE_KEY, GALLONS_PER_LITER, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
+import { estimateCoolingConsumptionGalPerDay } from "@/lib/analysis/water";
 import { EU_COUNTRIES, EU_VARIABLES, type EuVariable } from "@/lib/data/euDataCentres";
 
 const W = 420;
@@ -74,14 +75,15 @@ function scenarioValues(
       : (WUE_L_PER_KWH[wueKey]?.value ?? WUE_L_PER_KWH.us_average.value);
   const edcKwh = s.mwLoad * 1000 * pue * 8760;
   // Prefer the analysis's own water model once it has run — it already reflects the
-  // site's actual climate (see water.ts's climateWaterAdjustment), cooling technology's
-  // real consumption math (closed-loop makeup/refresh, evaporative WUE, or zero for dry
-  // rejection), not just a flat per-technology WUE constant. Falls back to the static
-  // WUE table (annualized) only before the analysis has resolved.
-  const win =
-    analysisConsumptionGalPerDay != null
-      ? (analysisConsumptionGalPerDay * 365) / GALLONS_PER_LITER / 1000
-      : (edcKwh * wue) / 1000;
+  // site's actual climate (see water.ts's climateWaterAdjustment). Before the analysis
+  // has resolved, fall back to the same closed-loop/evaporative math water.ts uses
+  // (climateMultiplier = 1, matching water.ts's own "no climate data" default) rather
+  // than the flat per-technology WUE_L_PER_KWH constant below, which reads 0 for
+  // chilled-water + air-cooled chiller even though that technology's real model has
+  // non-zero routine makeup/refresh water — the fallback needs to agree with it.
+  const consumptionGalPerDay =
+    analysisConsumptionGalPerDay ?? estimateCoolingConsumptionGalPerDay(s.mwLoad, s.coolingTechnology, 1);
+  const win = (consumptionGalPerDay * 365) / GALLONS_PER_LITER / 1000;
   return {
     pdit: s.mwLoad,
     edc: edcKwh / 1e6,
