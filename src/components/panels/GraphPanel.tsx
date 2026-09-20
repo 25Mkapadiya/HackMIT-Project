@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import type { ScenarioConfig } from "@/lib/types";
 import DraggablePanel from "@/components/ui/DraggablePanel";
-import { BASE_PUE_BY_COOLING_TECH, COOLING_TECH_TO_WUE_KEY, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
+import { BASE_PUE_BY_COOLING_TECH, COOLING_TECH_TO_WUE_KEY, GALLONS_PER_LITER, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
 import { EU_COUNTRIES, EU_VARIABLES, type EuVariable } from "@/lib/data/euDataCentres";
 
 const W = 420;
@@ -54,16 +54,29 @@ function VarSelect({ label, value, onChange }: { label: string; value: string; o
  * Values for a user-proposed site, derived from its scenario config with the same model
  * assumptions the analysis engine uses. ERF/REF aren't modelled, so they're omitted.
  */
-function scenarioValues(s: ScenarioConfig, analysisPue: number | null): Record<string, number> {
+function scenarioValues(
+  s: ScenarioConfig,
+  analysisPue: number | null,
+  analysisConsumptionGalPerDay: number | null
+): Record<string, number> {
   // Prefer the analysis's modeled PUE once it has run; otherwise the cooling technology's base PUE.
   const pue = analysisPue ?? BASE_PUE_BY_COOLING_TECH[s.coolingTechnology]?.value ?? 1.4;
   const wueKey = COOLING_TECH_TO_WUE_KEY[s.coolingTechnology] ?? "us_average";
   const wue = WUE_L_PER_KWH[wueKey]?.value ?? WUE_L_PER_KWH.us_average.value;
   const edcKwh = s.mwLoad * 1000 * pue * 8760;
+  // Prefer the analysis's own water model once it has run — it already reflects the
+  // site's actual climate (see water.ts's climateWaterAdjustment), cooling technology's
+  // real consumption math (closed-loop makeup/refresh, evaporative WUE, or zero for dry
+  // rejection), not just a flat per-technology WUE constant. Falls back to the static
+  // WUE table (annualized) only before the analysis has resolved.
+  const win =
+    analysisConsumptionGalPerDay != null
+      ? (analysisConsumptionGalPerDay * 365) / GALLONS_PER_LITER / 1000
+      : (edcKwh * wue) / 1000;
   return {
     pdit: s.mwLoad,
     edc: edcKwh / 1e6,
-    win: (edcKwh * wue) / 1000,
+    win,
     pue,
     wue,
   };
@@ -87,7 +100,12 @@ export default function GraphPanel() {
     const pts = all.filter((p): p is { c: typeof p.c; x: number; y: number } => p.x != null && p.y != null);
     const mine = scenarios.flatMap((sc) => {
       const a = analysisByScenario[sc.id];
-      const v = scenarioValues(sc, a?.status === "ready" ? a.data.efficiency.estimatedPue.value : null);
+      const ready = a?.status === "ready";
+      const v = scenarioValues(
+        sc,
+        ready ? a.data.efficiency.estimatedPue.value : null,
+        ready ? a.data.water.estimatedConsumptionGalPerDay.value : null
+      );
       const x = v[xKey];
       const y = v[yKey];
       return x != null && y != null ? [{ id: sc.id, label: sc.label, x, y }] : [];
