@@ -101,4 +101,5 @@ export const MO_SOURCES = {
   eia: NATIONAL_SOURCES.eia,
   peeringDb: NATIONAL_SOURCES.peeringDb,
   fccBroadband: NATIONAL_SOURCES.fccBroadband,
+  censusBroadband: NATIONAL_SOURCES.censusBroadband,
 } satisfies Record<string, SourceMeta>;

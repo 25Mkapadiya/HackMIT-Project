@@ -80,13 +80,43 @@ export const NATIONAL_SOURCES = {
     refreshFrequency: "Varies by dataset (generally monthly/annual)",
     methodology: "Server-side query using an EIA API key, filtered to the state; requires EIA_API_KEY to be configured.",
   },
+  /**
+   * FCC's own "Broadband Data Collection" Public Data API (broadbandmap.fcc.gov,
+   * auth via a username + hash_value token) is bulk-file-only: listAsOfDates,
+   * downloads/listAvailabilityData/{as_of_date}, and downloads/downloadFile/...
+   * return per-state CSV/zip extracts, not a live per-point or per-address
+   * lookup. There is no supported way to query "what's available at this lat/lng"
+   * from that API on every scenario placement. This entry stays as the citation
+   * for the underlying FCC program; the live per-scenario figure is computed
+   * from censusBroadband below instead — see fiber.ts.
+   */
   fccBroadband: {
     id: "fcc-broadband-map",
     name: "FCC National Broadband Map (BDC)",
     url: "https://broadbandmap.fcc.gov/",
     license: "Public (FCC)",
     refreshFrequency: "Semiannual BDC collection",
-    methodology: "Retail fixed-broadband availability by provider/technology at a location — a proxy for connectivity, not long-haul fiber routes. Requires FCC_BDC_API_KEY.",
+    methodology:
+      "Retail fixed-broadband availability by provider/technology, as reported by ISPs — the FCC's own program of record for broadband availability. Its Public Data API only exposes bulk per-state file downloads (no live point/address query endpoint), so it isn't used for a live per-scenario lookup here; see censusBroadband for what actually powers the live figure.",
+  },
+  /**
+   * Live per-request substitute for a point-level FCC BDC lookup (see the note
+   * on fccBroadband above for why BDC itself can't do this). ACS Subject Table
+   * S2801 ("Types of Computers and Internet Subscriptions") gives the share of
+   * households in the Census tract containing the site that report a home
+   * broadband subscription — a demand-side usage figure, not a supply-side
+   * availability claim, but it is real, live, tract-resolution data rather than
+   * a stub. Requires CENSUS_API_KEY (same key already used for the population
+   * estimate in land.ts).
+   */
+  censusBroadband: {
+    id: "census-acs5-subject-s2801",
+    name: "US Census Bureau — ACS 5-Year Subject Table S2801 (Internet Subscriptions)",
+    url: "https://api.census.gov/data/2022/acs/acs5/subject",
+    license: "Public domain (US Census Bureau)",
+    refreshFrequency: "Annual (ACS 5-year release)",
+    methodology:
+      "Percent of households in the Census tract containing the site reporting a wireline broadband subscription (cable, fiber, or DSL — variable S2801_C02_017E) and, for context, any broadband subscription including cellular/satellite (S2801_C02_014E). A household-subscription (demand-side) figure, not a survey of what a provider could deliver to a new commercial site — treat as connectivity context, not a substitute for calling carriers.",
   },
   cartoForestCover: {
     id: "carto-osm-forest-cover",
