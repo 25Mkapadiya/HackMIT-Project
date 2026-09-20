@@ -39,6 +39,16 @@ body {
 .maplibregl-ctrl-bottom-left {
   z-index: 10;
 }
+.maplibregl-ctrl-group {
+  background: rgba(19, 25, 36, 0.92) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32) !important;
+}
+.maplibregl-ctrl-group button {
+  filter: invert(1) brightness(1.6);
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
 .maplibregl-popup-content {
   background: #131924 !important;
   color: #eef2f7 !important;

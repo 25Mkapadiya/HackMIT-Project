@@ -263,16 +263,21 @@ export default function MapView() {
       center: WASHINGTON.center,
       zoom: WASHINGTON.defaultZoom,
       pitch: 0,
-      maxPitch: 68,
+      maxPitch: 0,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
       maxBounds: US_MAX_BOUNDS,
       minZoom: US_MIN_ZOOM,
       renderWorldCopies: false,
       attributionControl: { compact: true },
     });
-    // No compass control: it let people tilt/rotate the camera away from the
-    // straight-down siting view, so only the zoom buttons are kept.
+    // Tilting/rotating into 3D broke layer rendering and felt like the map was
+    // "freaking out" (labels and lines fighting for a straight-down siting
+    // view), so pitch/rotate is fully disabled above and pinch is zoom-only.
+    map.touchZoomRotate.disableRotation();
     const navigationControl = new maplibregl.NavigationControl({ showCompass: false });
-    map.addControl(navigationControl, "top-right");
+    map.addControl(navigationControl, "bottom-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "imperial", maxWidth: 120 }), "bottom-left");
 
     fitMinZoomToBounds(map);

@@ -108,6 +108,12 @@ export default function ScenarioPanel({ collapsed, onToggleCollapse }: { collaps
                 Compare
               </label>
             </div>
+            <button
+              onClick={() => removeScenario(active.id)}
+              className="w-full mt-2 text-[11.5px] font-medium text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 py-1.5 rounded-md transition-colors"
+            >
+              Remove This Data Center
+            </button>
           </div>
 
           {analysisState?.status === "error" && (
