@@ -12,6 +12,7 @@ import {
   fetchPopulationTracts,
   fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
+  tagLinesWithCountyDensity,
 } from "./nationalFetchers";
 
 export type { Bbox };
@@ -38,10 +39,11 @@ function generalizationFor(bbox: Bbox): number {
 // shared national transmission fetcher other states use.
 
 async function fetchTransmissionLines(bbox: Bbox) {
-  return queryArcGisGeoJSON(WA_SOURCES.bpaTransmission.url, {
+  const fc = await queryArcGisGeoJSON(WA_SOURCES.bpaTransmission.url, {
     bbox,
     outFields: "XRefCd,OperatingLineNm,VoltageMeas",
   });
+  return tagLinesWithCountyDensity(fc, bbox);
 }
 
 async function fetchUtilityTerritories(bbox: Bbox) {

@@ -445,9 +445,19 @@ export default function MapView() {
         if (!map.getSource(sourceId)) {
           map.addSource(sourceId, { type: "geojson", data });
           const specs = buildLayerSpecs(layer, sourceId, state.id);
+          // Population density loads as a toggle-on layer, often after
+          // transmission-lines is already on the map (it's default-visible in
+          // most states) — without this, its fill would get added on top and
+          // visually bury the lines it's meant to give context to. Anything
+          // added later goes on top by default, so insert it before the first
+          // transmission-line layer already present, if any.
+          const insertBeforeId =
+            layer.id === "population-density"
+              ? map.getStyle().layers?.find((l) => l.id.endsWith("-transmission-lines-line"))?.id
+              : undefined;
           for (const spec of specs) {
             if (!map.getLayer(spec.id)) {
-              map.addLayer(spec);
+              map.addLayer(spec, insertBeforeId);
               map.setLayoutProperty(spec.id, "visibility", "none");
             }
           }

@@ -1,4 +1,4 @@
-import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
+import type { Feature, FeatureCollection, Geometry, MultiPolygon, Point, Polygon } from "geojson";
 import { queryArcGisGeoJSON, type Bbox } from "./arcgis";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 import * as turf from "@turf/turf";
@@ -151,6 +151,15 @@ export function getCountyDensityRecord(geoid: string | null | undefined): County
 
 export const COUNTY_DENSITY_VINTAGE = { year: COUNTY_DENSITY.vintage, asOf: COUNTY_DENSITY.asOf };
 
+/** Shared raw county-boundary fetch — same params every caller uses, so they hit one cache entry. */
+async function fetchCountyPolygonsForBbox(bbox: Bbox) {
+  return queryArcGisGeoJSON<{ GEOID?: string; NAME?: string; STATE?: string }>(
+    NATIONAL_SOURCES.censusTiger.url + "/82",
+    { bbox, outFields: "GEOID,NAME,STATE", maxAllowableOffset: generalizationFor(bbox) },
+    TTL.ONE_DAY
+  );
+}
+
 /**
  * County polygons (live TIGERweb, layer 82 in tigerWMS_Current) with population
  * density joined in by GEOID from the precomputed Gazetteer+PEP dataset (see
@@ -158,11 +167,7 @@ export const COUNTY_DENSITY_VINTAGE = { year: COUNTY_DENSITY.vintage, asOf: COUN
  * only the density figures are a static annual snapshot.
  */
 export async function fetchCountyPopulationDensity(bbox: Bbox): Promise<FeatureCollection<Geometry, Record<string, unknown>>> {
-  const fc = await queryArcGisGeoJSON<{ GEOID?: string; NAME?: string; STATE?: string }>(
-    NATIONAL_SOURCES.censusTiger.url + "/82",
-    { bbox, outFields: "GEOID,NAME,STATE", maxAllowableOffset: generalizationFor(bbox) },
-    TTL.ONE_DAY
-  );
+  const fc = await fetchCountyPolygonsForBbox(bbox);
   return {
     type: "FeatureCollection",
     features: fc.features.map((f) => {
@@ -179,6 +184,43 @@ export async function fetchCountyPopulationDensity(bbox: Bbox): Promise<FeatureC
           PopulationDensityPerSqMi: record?.densityPerSqMi ?? null,
         },
       };
+    }),
+  };
+}
+
+/**
+ * Tags each line feature with the population density of the county it passes
+ * through (a representative point on the line, via turf.pointOnFeature —
+ * cheap and stable for both LineString and MultiLineString). This is what lets
+ * the map draw transmission lines with a "demand pressure" halo (see
+ * layerStyles.ts) instead of only showing population density as a separate,
+ * disconnected background layer — the whole point being to visually connect
+ * the two datasets, not just place them side by side.
+ */
+export async function tagLinesWithCountyDensity<P extends Record<string, unknown>>(
+  fc: FeatureCollection<Geometry, P>,
+  bbox: Bbox
+): Promise<FeatureCollection<Geometry, P & { PopulationDensityPerSqMi: number | null }>> {
+  const countyFc = await fetchCountyPolygonsForBbox(bbox);
+  return {
+    type: "FeatureCollection",
+    features: fc.features.map((f) => {
+      let density: number | null = null;
+      if (f.geometry) {
+        try {
+          const pt = turf.pointOnFeature(f as Feature<Geometry>);
+          for (const county of countyFc.features) {
+            if (!county.geometry) continue;
+            if (turf.booleanPointInPolygon(pt, county as Feature<Polygon | MultiPolygon>)) {
+              density = getCountyDensityRecord(county.properties?.GEOID ?? null)?.densityPerSqMi ?? null;
+              break;
+            }
+          }
+        } catch {
+          density = null;
+        }
+      }
+      return { ...f, properties: { ...f.properties, PopulationDensityPerSqMi: density } };
     }),
   };
 }
@@ -240,7 +282,7 @@ export async function fetchHifldTransmissionLines(bbox: Bbox): Promise<FeatureCo
     { bbox, outFields: "owner,voltage,volt_class,type,status,id,source" },
     TTL.ONE_DAY
   );
-  return {
+  const normalized: FeatureCollection<Geometry, Record<string, unknown>> = {
     type: "FeatureCollection",
     features: fc.features.map((f) => {
       const p = f.properties ?? {};
@@ -262,6 +304,7 @@ export async function fetchHifldTransmissionLines(bbox: Bbox): Promise<FeatureCo
       };
     }),
   };
+  return tagLinesWithCountyDensity(normalized, bbox);
 }
 
 /**
