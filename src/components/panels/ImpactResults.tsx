@@ -31,6 +31,20 @@ const SEVERITY_STYLE: Record<string, string> = {
   info: "border-l-2 border-slate-500 bg-slate-500/5",
 };
 
+// Plain-language stand-ins for the severity levels, shown as a small label on
+// each gap so meaning doesn't rely on color alone.
+const SEVERITY_LABEL: Record<string, string> = {
+  likely_required: "Needs follow-up",
+  watch: "Worth checking",
+  info: "Good to know",
+};
+
+const SEVERITY_LABEL_STYLE: Record<string, string> = {
+  likely_required: "text-rose-400",
+  watch: "text-amber-400",
+  info: "text-slate-400",
+};
+
 export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis }) {
   const { power, fiber, regulation, efficiency, water, land, noise, development, gaps } = analysis;
 
@@ -115,18 +129,22 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
       </Section>
 
       <div className="mb-1">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-0.5">
           <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
           <h4 className="text-[11px] font-bold tracking-[0.09em] uppercase text-rose-300">Infrastructure Gaps</h4>
         </div>
+        <div className="text-[10.5px] text-ink-600 mb-2">What still needs to be checked or built before this site is ready.</div>
         <div className="space-y-1.5">
           {gaps.map((g, i) => (
             <div key={i} className={`rounded-md px-2.5 py-2 ${SEVERITY_STYLE[g.severity]}`}>
+              <div className={`text-[9.5px] font-bold uppercase tracking-[0.06em] mb-0.5 ${SEVERITY_LABEL_STYLE[g.severity]}`}>
+                {SEVERITY_LABEL[g.severity] ?? g.severity}
+              </div>
               <div className="text-[12px] font-medium text-ink-100">{g.summary}</div>
               <div className="text-[11px] text-ink-500 mt-0.5 leading-snug">{g.detail}</div>
             </div>
           ))}
-          {gaps.length === 0 && <div className="text-[11px] text-ink-500">No significant gaps flagged by the current heuristics.</div>}
+          {gaps.length === 0 && <div className="text-[11px] text-ink-500">No major issues found for this site.</div>}
         </div>
       </div>
 

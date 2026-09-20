@@ -13,6 +13,10 @@ import { TRANSMISSION_PROXIMITY_BANDS, VOLTAGE_TIERS } from "@/lib/constants/ass
  * Synthesizes plain-language infrastructure gaps from the sequential analysis output.
  * Deliberately rule-based and transparent rather than a black-box score — every gap
  * traces back to a specific metric computed earlier in the pipeline.
+ *
+ * Copy here is written for a general audience, not an engineer: short sentences,
+ * no acronyms/jargon (kV, SFHA, PUE, etc.) without a plain-language stand-in, and
+ * one clear idea per gap rather than a technical justification.
  */
 export function synthesizeGaps(
   power: PowerAnalysis,
@@ -29,30 +33,30 @@ export function synthesizeGaps(
     gaps.push({
       category: "power",
       severity: "likely_required",
-      summary: "No mapped transmission line found near this site.",
-      detail: "No transmission line was found within the search radius. New transmission or a long interconnection extension is likely required.",
+      summary: "No power line found nearby.",
+      detail: "Building a new connection to the power grid would likely be needed, which adds cost and time.",
     });
   } else if (nearestKv > TRANSMISSION_PROXIMITY_BANDS.moderate) {
     gaps.push({
       category: "power",
       severity: "likely_required",
-      summary: `Nearest transmission line is ${nearestKv} mi away.`,
-      detail: "Significant new transmission or distribution build-out is likely required to reach the grid at this distance.",
+      summary: `The closest power line is ${nearestKv} mi away.`,
+      detail: "That's far enough that a new power line would likely need to be built to reach this site.",
     });
   } else if (nearestKv > TRANSMISSION_PROXIMITY_BANDS.close) {
     gaps.push({
       category: "power",
       severity: "watch",
-      summary: `Nearest transmission line is ${nearestKv} mi away.`,
-      detail: "A dedicated interconnection line/tap extension is likely needed to reach the site.",
+      summary: `The closest power line is ${nearestKv} mi away.`,
+      detail: "A new connector line would likely be needed to reach the site.",
     });
   }
 
   gaps.push({
     category: "power",
     severity: "likely_required",
-    summary: "Interconnection study required to confirm available capacity.",
-    detail: "Transmission proximity does not indicate available substation/feeder headroom. A formal interconnection study with the serving utility or transmission operator is the standard next step for a facility of this size.",
+    summary: "The power company needs to confirm there's enough capacity.",
+    detail: "Being near a power line doesn't guarantee it has room for a facility this size — that has to be checked and approved by the local utility.",
   });
 
   const nearestSubMi = power.nearestSubstation.distanceMiles;
@@ -61,29 +65,29 @@ export function synthesizeGaps(
     gaps.push({
       category: "power",
       severity: "likely_required",
-      summary: "No known substation found near this site.",
-      detail: "No mapped substation was found within the search radius. A new substation or a long distribution/transmission extension is likely required to interconnect this facility.",
+      summary: "No power substation found nearby.",
+      detail: "A new substation, or a long new power line, would likely be needed to connect this site.",
     });
   } else if (nearestSubMi > TRANSMISSION_PROXIMITY_BANDS.moderate) {
     gaps.push({
       category: "power",
       severity: "likely_required",
-      summary: `Nearest known substation is ${nearestSubMi} mi away.`,
-      detail: "At this distance, a new substation or significant distribution/transmission build-out is likely required to interconnect the facility economically — plan for materially higher interconnection cost and lead time than a closer site.",
+      summary: `The closest substation is ${nearestSubMi} mi away.`,
+      detail: "At this distance, a new substation or major power line work is likely needed — expect higher cost and a longer timeline than a closer site.",
     });
   } else if (nearestSubMi > TRANSMISSION_PROXIMITY_BANDS.close) {
     gaps.push({
       category: "power",
       severity: "watch",
-      summary: `Nearest known substation (${substationLabel ?? "unnamed"}) is ${nearestSubMi} mi away.`,
-      detail: "A dedicated feeder or short transmission tap to the nearest substation is likely needed, adding cost and schedule versus a facility sited directly adjacent to one.",
+      summary: `The closest substation (${substationLabel ?? "unnamed"}) is ${nearestSubMi} mi away.`,
+      detail: "A new connector line to that substation would likely be needed, adding some cost and time.",
     });
   } else if (nearestSubMi <= TRANSMISSION_PROXIMITY_BANDS.veryClose) {
     gaps.push({
       category: "power",
       severity: "info",
-      summary: `${substationLabel ?? "A known substation"} is only ${nearestSubMi} mi away${power.nearestSubstation.maxVoltageKv ? ` (up to ${power.nearestSubstation.maxVoltageKv} kV)` : ""}.`,
-      detail: "Close substation proximity is a favorable siting signal that typically shortens the interconnection tap and lowers its cost — but it does not confirm available headroom, which still requires a utility interconnection study.",
+      summary: `${substationLabel ?? "A substation"} is only ${nearestSubMi} mi away.`,
+      detail: "Good sign — being this close to a substation usually makes connecting power faster and cheaper. The utility still needs to confirm there's enough capacity, though.",
     });
   }
 
@@ -94,8 +98,8 @@ export function synthesizeGaps(
     gaps.push({
       category: "power",
       severity: demandPressure === "Very High" && (nearestKvValue == null || nearestKvValue < VOLTAGE_TIERS.high) ? "watch" : "info",
-      summary: `${densityInfo.countyName ?? "This county"} has ${demandPressure.toLowerCase()} existing population density (~${Math.round(densityInfo.densityPerSqMi ?? 0).toLocaleString()}/sq mi).`,
-      detail: "Denser counties tend to carry more existing residential/commercial load on the same transmission and distribution system, which can leave less available headroom for a new large facility even where a high-voltage line is nearby. Weight this alongside the interconnection study, not as a substitute for it.",
+      summary: `${densityInfo.countyName ?? "This county"} is a ${demandPressure.toLowerCase()}-density area.`,
+      detail: `About ${Math.round(densityInfo.densityPerSqMi ?? 0).toLocaleString()} people per square mile already live here, which usually means less spare power capacity for a new large facility. This should be weighed alongside the utility's own capacity check.`,
     });
   }
 
@@ -103,8 +107,8 @@ export function synthesizeGaps(
     gaps.push({
       category: "fiber",
       severity: "watch",
-      summary: "No nearby colocation/interconnection facility identified.",
-      detail: "Long-haul fiber routing to this site is unverified. Confirm carrier availability directly with regional providers.",
+      summary: "No nearby internet hub found.",
+      detail: "It's unclear whether high-speed fiber internet reaches this site — confirm directly with local internet providers.",
     });
   }
 
@@ -112,15 +116,15 @@ export function synthesizeGaps(
     gaps.push({
       category: "water",
       severity: "likely_required",
-      summary: "Site is within a declared drought area.",
-      detail: "Water-cooled designs may face permitting or supply constraints. Consider air-cooled or closed-loop alternatives, or confirm supply with the local water purveyor.",
+      summary: "This area experiences drought conditions.",
+      detail: "Cooling systems that use a lot of water may run into supply or permitting problems here. Air-cooling or other water-saving designs would likely work better.",
     });
   } else if (water.waterStressLabel.value === "Medium") {
     gaps.push({
       category: "water",
       severity: "watch",
-      summary: "Moderate existing water-right allocation density nearby.",
-      detail: "Multiple existing water rights were found near this site — new water rights or a municipal supply agreement may take longer to secure.",
+      summary: "Water is already in moderate demand nearby.",
+      detail: "Other users nearby already hold water rights, so getting new water access here could take longer than usual.",
     });
   }
 
@@ -128,8 +132,8 @@ export function synthesizeGaps(
     gaps.push({
       category: "water",
       severity: "watch",
-      summary: "No major surface water body found nearby.",
-      detail: "Open-loop / evaporative cooling designs relying on surface water withdrawal may not be viable at this location; groundwater or municipal supply would need to be confirmed.",
+      summary: "No lake or river found nearby.",
+      detail: "Cooling that relies on river or lake water isn't a good fit here — the site would likely need groundwater or a city water supply instead.",
     });
   }
 
@@ -138,8 +142,8 @@ export function synthesizeGaps(
     gaps.push({
       category: "land",
       severity: "likely_required",
-      summary: "Site is in a FEMA high-risk (SFHA) flood zone.",
-      detail: "Flood mitigation design and flood insurance requirements are likely, and permitting may be more complex.",
+      summary: "This site is in a high-risk flood zone.",
+      detail: "Flood insurance and flood-resistant construction would likely be required, and permitting will probably take longer.",
     });
   }
 
@@ -147,26 +151,28 @@ export function synthesizeGaps(
     gaps.push({
       category: "land",
       severity: "watch",
-      summary: `Nearest state highway is ${land.nearestMajorRoadMiles.value} mi away.`,
-      detail: "Construction logistics and equipment delivery may require new or upgraded access roads.",
+      summary: `The nearest major road is ${land.nearestMajorRoadMiles.value} mi away.`,
+      detail: "That distance could make it more expensive to deliver construction equipment and materials.",
     });
   }
 
   // Noise alone never disqualifies a site — it's one input to the gaps list,
-  // same as flood risk or water stress, not an automatic fail.
+  // same as flood risk or water stress, not an automatic fail. Kept in plain
+  // language for the general-audience gaps list, separate from the technical
+  // methodology explanation shown elsewhere (noise.explanation).
   if (noise.classification === "high") {
     gaps.push({
       category: "community",
       severity: "likely_required",
-      summary: "Noise impact screens as HIGH.",
-      detail: `${noise.explanation} Noise mitigation (equipment enclosures, acoustic barriers, or siting setbacks) is likely required for community acceptance and permitting.`,
+      summary: "Noise could be a problem for nearby residents.",
+      detail: "The combination of a loud cooling system and nearby homes means noise controls — like sound barriers or equipment enclosures — would likely be needed to satisfy neighbors and permitting.",
     });
   } else if (noise.classification === "significant") {
     gaps.push({
       category: "community",
       severity: "watch",
-      summary: "Noise impact screens as SIGNIFICANT.",
-      detail: `${noise.explanation} Worth a closer look during design — an acoustics consultant or community engagement early can head off permitting friction later.`,
+      summary: "Noise is worth keeping an eye on.",
+      detail: "Nearby residents could notice some noise from this facility. Planning ahead — sound barriers, or talking with the community early — can help avoid issues later.",
     });
   }
 
@@ -174,8 +180,8 @@ export function synthesizeGaps(
     gaps.push({
       category: "land",
       severity: "info",
-      summary: "Jurisdiction could not be determined automatically.",
-      detail: "Confirm the governing county/city directly to scope permitting requirements.",
+      summary: "Couldn't automatically identify the local government.",
+      detail: "Confirm the county or city directly to understand the permitting rules for this site.",
     });
   }
 
