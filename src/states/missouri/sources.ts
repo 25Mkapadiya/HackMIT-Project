@@ -84,6 +84,7 @@ export const MO_SOURCES = {
       "Program guidance for qualifying new/expanded data-center facilities. Eligibility must be verified for each project.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

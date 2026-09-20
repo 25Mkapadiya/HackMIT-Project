@@ -17,6 +17,7 @@ export const WY_SOURCES = {
     methodology: "Hand-curated, illustrative marker for the Cheyenne data center market (publicly reported hyperscale and colocation presence). Area coordinates only; MW is UNKNOWN.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

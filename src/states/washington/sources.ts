@@ -1,4 +1,5 @@
 import type { SourceMeta } from "@/lib/types";
+import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 
 /**
  * Canonical source metadata for every Washington dataset the platform uses.
@@ -22,6 +23,7 @@ export const WA_SOURCES = {
     refreshFrequency: "Live ArcGIS FeatureServer",
     methodology: "Point-in-polygon lookup against utility-provided/UTC service area boundaries.",
   },
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   waWaterDiversions: {
     id: "wa-water-diversions",
     name: "WA Dept. of Ecology — Water Right Diversions (NHD-located)",

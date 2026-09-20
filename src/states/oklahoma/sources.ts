@@ -37,6 +37,7 @@ export const OK_SOURCES = {
   },
   // ---- Nationwide (shared — see NATIONAL_SOURCES for the canonical definitions) ----
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

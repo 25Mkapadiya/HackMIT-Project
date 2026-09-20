@@ -12,6 +12,7 @@ export const IL_SOURCES = {
       "Illinois research identifies major clusters and operators, but the current seed does not include verified facility coordinates. The layer intentionally stays empty until point locations are verified.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

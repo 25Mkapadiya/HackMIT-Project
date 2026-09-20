@@ -12,6 +12,7 @@ import {
   fetchEiaPowerPlants,
   fetchHifldTransmissionLines,
   fetchHifldUtilityTerritories,
+  fetchHifldSubstations,
   fetchUsDroughtMonitor,
 } from "./nationalFetchers";
 
@@ -50,6 +51,7 @@ export function buildStandardStateLayerFetchers(
   const rawFetchers: Record<string, Fetcher> = {
     "transmission-lines": fetchHifldTransmissionLines,
     "utility-territories": fetchHifldUtilityTerritories,
+    "electric-substations": fetchHifldSubstations,
     "hydrography-rivers": fetchNhdFlowline,
     "hydrography-waterbodies": fetchNhdWaterbody,
     "drought-areas": fetchUsDroughtMonitor,

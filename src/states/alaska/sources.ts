@@ -17,6 +17,7 @@ export const AK_SOURCES = {
     methodology: "Alaska research names Anchorage, Fairbanks and Juneau as markets but supplies no facility-verified coordinates, so no points are shown rather than fabricating locations.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

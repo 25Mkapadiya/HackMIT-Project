@@ -13,6 +13,17 @@ interface TransmissionProps {
   VoltageMeas?: number;
 }
 
+interface SubstationProps {
+  Name?: string | null;
+  County?: string | null;
+  State?: string | null;
+  Status?: string | null;
+  Owner?: string | null;
+  Lines?: number | null;
+  MaxVoltKv?: number | null;
+  MinVoltKv?: number | null;
+}
+
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
 interface CensusGeographyResponse {
@@ -75,7 +86,7 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
   const territoryBbox = bboxAroundMiles(lng, lat, 20);
   const generationBbox = bboxAroundMiles(lng, lat, NEARBY_GENERATION_RADIUS_MI);
 
-  const [transmissionFc, territoryFc, generationFc, county] = await Promise.all([
+  const [transmissionFc, territoryFc, generationFc, substationFc, county] = await Promise.all([
     getFetcher(stateId, "transmission-lines")(transmissionBbox) as Promise<FeatureCollection<Geometry, TransmissionProps>>,
     getFetcher(stateId, "utility-territories")(territoryBbox) as Promise<
       FeatureCollection<Geometry, { Name?: string }>
@@ -83,6 +94,7 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
     getFetcher(stateId, "power-plants")(generationBbox) as Promise<
       FeatureCollection<Geometry, { plantName?: string; fuel?: string; nameplateMw?: number }>
     >,
+    getFetcher(stateId, "electric-substations")(transmissionBbox) as Promise<FeatureCollection<Geometry, SubstationProps>>,
     getCountyGeoid(lng, lat),
   ]);
 
@@ -104,6 +116,17 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
   );
 
   const territory = polygonContaining(lng, lat, territoryFc);
+
+  const nearestSubstationResult = nearestFeature(lng, lat, substationFc);
+  const substationProps = nearestSubstationResult.feature?.properties ?? null;
+  const nearestSubstation: PowerAnalysis["nearestSubstation"] = {
+    distanceMiles: nearestSubstationResult.distanceMiles,
+    nearestFeatureLabel: substationProps?.Name ?? (substationProps ? `Substation (${substationProps.County ?? "unnamed"})` : null),
+    maxVoltageKv: substationProps?.MaxVoltKv ?? null,
+    lineCount: substationProps?.Lines ?? null,
+    confidence: nearestSubstationResult.feature ? "fact" : "unknown",
+    source: NATIONAL_SOURCES.hifldSubstations,
+  };
 
   const eiaConfigured = Boolean(process.env.EIA_API_KEY);
   const plants = generationFc.features
@@ -129,6 +152,7 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
     nearest115kv: nearest115,
     nearest230kv: nearest230,
     nearest500kv: nearest500,
+    nearestSubstation,
     utilityTerritory: {
       label: "Utility service territory",
       value: (territory?.properties as { Name?: string } | undefined)?.Name ?? null,
@@ -151,7 +175,10 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
       confidence: "unknown",
       source: bundle.transmissionSource,
       caveats: [
-        "Substation and feeder headroom are not published data. Transmission-line proximity indicates access to the grid, not available capacity.",
+        nearestSubstation.nearestFeatureLabel
+          ? `Nearest known substation is ${nearestSubstation.distanceMiles} mi away (${nearestSubstation.nearestFeatureLabel}${nearestSubstation.maxVoltageKv ? `, up to ${nearestSubstation.maxVoltageKv} kV` : ""}) — location only, not a statement of available headroom.`
+          : "No known substation location found near this site in the source dataset.",
+        "Substation and feeder headroom are not published data. Transmission-line and substation proximity indicate access to the grid, not available capacity.",
         "A formal interconnection study by the transmission owner / serving utility is required to determine actual available capacity.",
       ],
     },

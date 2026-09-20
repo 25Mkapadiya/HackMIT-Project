@@ -92,6 +92,32 @@ export function buildLayerSpecs(
     ];
   }
 
+  if (layer.id === "electric-substations") {
+    const voltageColor: DataDrivenPropertyValueSpecification<string> = [
+      "step",
+      ["coalesce", ["get", "MaxVoltKv"], 0],
+      "#8fa3bf",
+      115,
+      "#f2b93b",
+      345,
+      "#ff5470",
+    ];
+    return [
+      {
+        id: `${mapLayerId}-point`,
+        type: "circle",
+        source: sourceId,
+        paint: {
+          "circle-radius": 4.5,
+          "circle-color": voltageColor,
+          "circle-stroke-width": 1.2,
+          "circle-stroke-color": "#0a0d12",
+          "circle-opacity": 0.9,
+        },
+      },
+    ];
+  }
+
   if (layer.id === "population-density") {
     // Same demand-pressure ramp as the transmission-line halo above, but kept
     // deliberately quiet: no fill at all below the "low" tier (most of a state's

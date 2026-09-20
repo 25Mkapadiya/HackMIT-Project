@@ -27,6 +27,7 @@ export const TX_SOURCES = {
     methodology: "Hand-curated illustrative list of publicly reported Texas data center campuses/projects. NOT exhaustive — Texas is one of the largest data center markets in the country — and NOT independently verified against parcel/operator records.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

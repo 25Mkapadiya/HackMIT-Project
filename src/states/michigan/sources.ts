@@ -18,6 +18,7 @@ export const MI_SOURCES = {
     methodology: "Hand-curated illustrative list of publicly reported Michigan data center/colocation markets. NOT exhaustive and NOT independently verified against parcel/operator records.",
   },
   hifldTransmission: NATIONAL_SOURCES.hifldTransmission,
+  hifldSubstations: NATIONAL_SOURCES.hifldSubstations,
   hifldUtilityTerritories: NATIONAL_SOURCES.hifldUtilityTerritories,
   usgsNhdFlowline: NATIONAL_SOURCES.usgsNhdFlowline,
   usgsNhdWaterbody: NATIONAL_SOURCES.usgsNhdWaterbody,

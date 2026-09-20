@@ -41,6 +41,24 @@ export const KS_LAYERS: LayerDefinition[] = [
     color: "#5b7a9d",
     legend: [{ label: "Utility territory boundary", color: "#5b7a9d", swatch: "fill" }],
   },
+  {
+    id: "electric-substations",
+    name: "Electric Substations",
+    shortName: "Substations",
+    category: "power",
+    geometryType: "point",
+    source: KS_SOURCES.hifldSubstations,
+    confidence: "fact",
+    description:
+      "HIFLD electric substation locations (nationwide legacy extract, static — see source note), split by transmission voltage tier. Distance to the nearest substation is a proxy for interconnection access, not confirmed available capacity.",
+    defaultVisible: false,
+    endpoint: "/api/gis/electric-substations",
+    legend: [
+      { label: "345 kV+", color: "#ff5470", swatch: "circle" },
+      { label: "115–344 kV", color: "#f2b93b", swatch: "circle" },
+      { label: "< 115 kV / unknown", color: "#8fa3bf", swatch: "circle" },
+    ],
+  },
 
   // ---------------------------------------------------------------- WATER
   {
