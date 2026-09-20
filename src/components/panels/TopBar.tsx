@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { STATE_REGISTRY, getState, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
+import { BookIcon } from "@/components/learn/icons";
 
 export default function TopBar() {
   const proposeMode = useAppStore((s) => s.proposeMode);
@@ -94,6 +96,15 @@ export default function TopBar() {
             <div className="hidden lg:block text-[9.5px] text-ink-500 tracking-wide truncate max-w-[220px]">{subtitle}</div>
           )}
         </div>
+
+        <Link
+          href="/learn"
+          title="Learn what data centers are and how GEO evaluates their impact"
+          className="shrink-0 flex items-center gap-1.5 text-[11px] lg:text-[12px] font-medium text-ink-300 hover:text-ink-100 transition-colors px-2 py-1 rounded-md hover:bg-base-800"
+        >
+          <BookIcon className="h-3.5 w-3.5" />
+          <span>Learn</span>
+        </Link>
 
         <div
           ref={stateSearchRef}
