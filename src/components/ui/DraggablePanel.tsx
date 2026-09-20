@@ -14,6 +14,8 @@ interface DraggablePanelProps {
   onToggleCollapse?: () => void;
   headerAccent?: string;
   className?: string;
+  /** Set false to pin the panel at defaultPosition and disable header drag entirely. */
+  draggable?: boolean;
 }
 
 /**
@@ -32,6 +34,7 @@ export default function DraggablePanel({
   onToggleCollapse,
   headerAccent = "#8fa3bf",
   className = "",
+  draggable = true,
 }: DraggablePanelProps) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -39,6 +42,7 @@ export default function DraggablePanel({
   const [dragging, setDragging] = useState(false);
 
   function onPointerDown(e: React.PointerEvent) {
+    if (!draggable) return;
     const rect = panelRef.current?.getBoundingClientRect();
     const origX = pos?.x ?? rect?.left ?? 0;
     const origY = pos?.y ?? rect?.top ?? 0;
@@ -64,7 +68,7 @@ export default function DraggablePanel({
   }
 
   const style: CSSProperties =
-    pos !== null
+    draggable && pos !== null
       ? { left: pos.x, top: pos.y }
       : anchor === "right"
         ? { right: defaultPosition.x, top: defaultPosition.y }
@@ -77,7 +81,9 @@ export default function DraggablePanel({
       style={{ ...style, width, userSelect: dragging ? "none" : undefined }}
     >
       <div
-        className="flex items-center justify-between gap-2 px-3.5 py-2.5 cursor-grab active:cursor-grabbing rounded-t-xl border-b border-base-700/80"
+        className={`flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-t-xl border-b border-base-700/80 ${
+          draggable ? "cursor-grab active:cursor-grabbing" : ""
+        }`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

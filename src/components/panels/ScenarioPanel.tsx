@@ -31,6 +31,7 @@ export default function ScenarioPanel({ collapsed, onToggleCollapse }: { collaps
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
         headerAccent="#ff5470"
+        draggable={false}
       >
         <div className="px-4 py-6 text-center">
           <div className="text-[12.5px] text-ink-300 leading-relaxed">
@@ -52,6 +53,7 @@ export default function ScenarioPanel({ collapsed, onToggleCollapse }: { collaps
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       headerAccent="#ff5470"
+      draggable={false}
     >
       {/* site tabs */}
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 overflow-x-auto no-scrollbar">

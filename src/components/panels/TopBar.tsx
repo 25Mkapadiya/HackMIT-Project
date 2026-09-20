@@ -7,9 +7,10 @@ import { STATE_REGISTRY, getState, getShowAllStates } from "@/states/registry";
 export default function TopBar() {
   const proposeMode = useAppStore((s) => s.proposeMode);
   const setProposeMode = useAppStore((s) => s.setProposeMode);
+  const scenarios = useAppStore((s) => s.scenarios);
   const comparisonIds = useAppStore((s) => s.comparisonIds);
+  const setComparisonIds = useAppStore((s) => s.setComparisonIds);
   const setComparisonOpen = useAppStore((s) => s.setComparisonOpen);
-  const comparisonOpen = useAppStore((s) => s.comparisonOpen);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const setActiveStateId = useAppStore((s) => s.setActiveStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
@@ -26,16 +27,23 @@ export default function TopBar() {
       ? "Data Center Siting Intelligence"
       : `${activeState?.name ?? "Selected state"} — coming soon, showing Washington's live analysis`;
 
+  const sortedStates = useMemo(
+    () => [...STATE_REGISTRY].sort((a, b) => a.name.localeCompare(b.name)),
+    []
+  );
+
+  // With no query typed, the dropdown still opens (via the chevron or focus)
+  // showing every state so it doubles as a scrollable "browse all 50" list.
   const filteredStates = useMemo(() => {
     const query = stateQuery.trim().toLowerCase();
-    if (!query) return [];
+    if (!query) return sortedStates;
 
-    return STATE_REGISTRY.filter((state) => {
+    return sortedStates.filter((state) => {
       const stateName = state.name.toLowerCase();
       const stateId = state.id.toLowerCase();
       return stateName.includes(query) || stateId.includes(query);
     });
-  }, [stateQuery]);
+  }, [stateQuery, sortedStates]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -55,8 +63,13 @@ export default function TopBar() {
     setStateSearchOpen(false);
   };
 
+  const openComparison = () => {
+    if (comparisonIds.length < 2) setComparisonIds(scenarios.map((s) => s.id));
+    setComparisonOpen(true);
+  };
+
   return (
-    <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between gap-4 px-4 h-14 glass-panel border-b border-base-700">
+    <div className="absolute top-0 left-0 right-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 h-14 glass-panel border-b border-base-700">
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2">
           <div className="h-7 w-7 rounded-md bg-gradient-to-br from-accent-power to-accent-proposed flex items-center justify-center text-[13px] font-bold text-base-950">
@@ -109,21 +122,36 @@ export default function TopBar() {
               }}
               placeholder="Search states..."
               aria-label="Search by state"
-              aria-expanded={stateSearchOpen}
               className="min-w-0 flex-1 bg-transparent text-[11px] text-ink-100 placeholder:text-ink-300 focus:outline-none"
             />
-            <span className="truncate text-[10px] text-ink-500 max-w-[74px]" title={activeState?.name}>
-              {activeState?.name}
-            </span>
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                 showAllStates || activeState?.enabled ? "bg-emerald-400" : "bg-amber-400"
               }`}
               title={activeState?.enabled ? "State data available" : "State data coming soon"}
             />
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setStateSearchOpen((open) => !open)}
+              aria-label="Browse all states"
+              aria-expanded={stateSearchOpen}
+              className="shrink-0 text-ink-500 hover:text-ink-100 transition-colors"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className={`h-3 w-3 transition-transform ${stateSearchOpen ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
           </div>
 
-          {stateSearchOpen && stateQuery.trim() && (
+          {stateSearchOpen && (
             <div className="absolute left-3 top-[38px] w-[210px] max-h-72 overflow-y-auto rounded-md border border-base-700 bg-base-900 shadow-2xl">
               {filteredStates.length > 0 ? (
                 filteredStates.map((state) => (
@@ -156,7 +184,19 @@ export default function TopBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <button
+        onClick={() => setProposeMode(!proposeMode)}
+        disabled={!showAllStates && !activeState?.enabled}
+        className={`justify-self-center text-[14px] font-semibold px-6 py-2.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+          proposeMode
+            ? "bg-accent-proposed text-white shadow-[0_0_0_3px_rgba(255,84,112,0.25)]"
+            : "bg-ink-100 text-base-950 hover:brightness-95"
+        }`}
+      >
+        {proposeMode ? "Click the map to place site…" : "+ Propose Data Center"}
+      </button>
+
+      <div className="flex items-center justify-end gap-2 shrink-0">
         <button
           onClick={() => setShowAllStates(!showAllStates)}
           className={`text-[12px] font-semibold px-3 py-1.5 rounded-md border transition-all ${
@@ -168,24 +208,17 @@ export default function TopBar() {
         >
           {showAllStates ? `Showing All (${implementedStates.length})` : `Show All (${implementedStates.length})`}
         </button>
-        {comparisonIds.length >= 2 && (
-          <button
-            onClick={() => setComparisonOpen(!comparisonOpen)}
-            className="text-[12px] font-medium px-3 py-1.5 rounded-md border border-base-600 text-ink-100 hover:bg-base-800 transition-colors"
-          >
-            Compare Sites ({comparisonIds.length})
-          </button>
-        )}
         <button
-          onClick={() => setProposeMode(!proposeMode)}
-          disabled={!showAllStates && !activeState?.enabled}
-          className={`text-[12.5px] font-semibold px-4 py-1.5 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-            proposeMode
-              ? "bg-accent-proposed text-white shadow-[0_0_0_3px_rgba(255,84,112,0.25)]"
-              : "bg-ink-100 text-base-950 hover:brightness-95"
-          }`}
+          onClick={openComparison}
+          disabled={scenarios.length < 2}
+          title={
+            scenarios.length < 2
+              ? "Propose 2+ sites to compare placements"
+              : "Compare proposed sites side by side to judge the best placement"
+          }
+          className="text-[12px] font-medium px-3 py-1.5 rounded-md border border-base-600 text-ink-100 hover:bg-base-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
         >
-          {proposeMode ? "Click the map to place site…" : "+ Propose Data Center"}
+          Compare Sites{scenarios.length >= 2 ? ` (${scenarios.length})` : ""}
         </button>
       </div>
     </div>

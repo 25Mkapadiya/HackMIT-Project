@@ -42,6 +42,7 @@ interface AppState {
   // comparison
   comparisonIds: string[];
   toggleComparisonId: (id: string) => void;
+  setComparisonIds: (ids: string[]) => void;
   comparisonOpen: boolean;
   setComparisonOpen: (v: boolean) => void;
 }
@@ -165,6 +166,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? s.comparisonIds.filter((c) => c !== id)
         : [...s.comparisonIds, id],
     })),
+  setComparisonIds: (ids) => set({ comparisonIds: ids }),
   comparisonOpen: false,
   setComparisonOpen: (v) => set({ comparisonOpen: v }),
 }));

@@ -143,10 +143,13 @@ export function getEnabledStates(): StateDefinition[] {
   return STATE_REGISTRY.filter((s) => s.enabled);
 }
 
-// Alaska remains available as an individual live state, but is intentionally
-// excluded from the nationwide Show All experience for now.
+// Alaska and Hawaii remain available as individual live states, but are
+// intentionally excluded from the nationwide Show All experience — both sit
+// far enough outside the contiguous U.S. that including them would skew the
+// Show All camera framing and (for Hawaii, previously) require a separate
+// inset map just to stay visible.
 export function getShowAllStates(): StateDefinition[] {
-  return getEnabledStates().filter((s) => s.id !== "alaska");
+  return getEnabledStates().filter((s) => s.id !== "alaska" && s.id !== "hawaii");
 }
 
 // Deployment refresh: keep Vercel Git integration in sync with main.

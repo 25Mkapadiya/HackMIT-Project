@@ -25,6 +25,8 @@ function stateBboxParam(stateId: string): string {
   return [state.bounds[0][0], state.bounds[0][1], state.bounds[1][0], state.bounds[1][1]].join(",");
 }
 
+// getShowAllStates() already excludes Alaska and Hawaii (see registry.ts), so
+// this bbox stays mainland-only and the Show All camera centers correctly.
 function implementedStatesBounds(): [[number, number], [number, number]] {
   const states = getShowAllStates();
   if (states.length === 0) return getState(DEFAULT_STATE_ID)!.bounds;
@@ -51,9 +53,9 @@ const LAYER_FADE_MS = 500;
 const RIPPLE_DURATION_MS = 1500;
 const RIPPLE_MAX_RADIUS_PX = 240;
 const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
-// Distance -> delay uses smoothstep, not ease-out. getShowAllStates()
-// includes Hawaii, so maxDistance is ~35-40° (Hawaii or Maine/Florida) — an
-// ease-out curve's steep initial slope meant even Oregon/California sat
+// Distance -> delay uses smoothstep, not ease-out. maxDistance spans the
+// contiguous U.S. (roughly Maine/Florida from Washington) — an ease-out
+// curve's steep initial slope meant even Oregon/California sat
 // through 450ms-1.3s of pure artificial delay before appearing at all, which
 // read as "nothing is happening" rather than a spread. Smoothstep has zero
 // slope at both ends: nearby states still start appearing almost immediately
@@ -163,9 +165,7 @@ function playRippleFromWashington(map: maplibregl.Map, origin: [number, number],
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const hawaiiContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const hawaiiMapRef = useRef<maplibregl.Map | null>(null);
   const loadedLayerIds = useRef<Set<string>>(new Set());
   const loadingLayerIds = useRef<Set<string>>(new Set());
   const preloadedLayerDataRef = useRef<Map<string, FeatureCollection>>(new Map());
@@ -181,9 +181,6 @@ export default function MapView() {
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const usBoundaryRef = useRef<FeatureCollection<Polygon | MultiPolygon> | null>(null);
-  const activeScenarioRef = useRef<{ id: string; label: string; lng: number; lat: number } | null>(null);
-  const focusedScenarioIdRef = useRef<string | null>(null);
-  const focusAnimatingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
   const layerVisibility = useAppStore((s) => s.layerVisibility);
@@ -194,11 +191,6 @@ export default function MapView() {
   const showAllStates = useAppStore((s) => s.showAllStates);
   const addScenario = useAppStore((s) => s.addScenario);
   const setActiveScenario = useAppStore((s) => s.setActiveScenario);
-  // Declared after activeStateId (used before its own declaration otherwise —
-  // useRef's initializer runs during render, so this must come after the hook
-  // that produces the value it seeds).
-  const activeStateIdRef = useRef(activeStateId);
-  const showAllStatesRef = useRef(showAllStates);
 
   // ---- preload implemented-state GIS data (once) ----
   // Start network work immediately on mount, before the map is ready. This keeps
@@ -277,41 +269,11 @@ export default function MapView() {
       renderWorldCopies: false,
       attributionControl: { compact: true },
     });
-    const navigationControl = new maplibregl.NavigationControl({ visualizePitch: true });
+    // No compass control: it let people tilt/rotate the camera away from the
+    // straight-down siting view, so only the zoom buttons are kept.
+    const navigationControl = new maplibregl.NavigationControl({ showCompass: false });
     map.addControl(navigationControl, "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "imperial", maxWidth: 120 }), "bottom-left");
-
-    // Repurpose the existing white compass button as a guided "focus active site"
-    // control once a data-center scenario exists. Before that, it keeps its normal
-    // north-reset behavior.
-    const compassButton = map
-      .getContainer()
-      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
-    const handleCompassFocus = (event: MouseEvent) => {
-      const target = activeScenarioRef.current;
-      if (!target || focusAnimatingRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      focusAnimatingRef.current = true;
-
-      if (focusedScenarioIdRef.current === target.id) {
-        const state = getState(activeStateIdRef.current) ?? getState(DEFAULT_STATE_ID)!;
-        const returnBounds = showAllStatesRef.current ? implementedStatesBounds() : state.bounds;
-        spiralZoomOutToState(map, returnBounds, () => {
-          focusedScenarioIdRef.current = null;
-          focusAnimatingRef.current = false;
-          syncCompassLabel(map, target, false);
-        });
-      } else {
-        spiralFocusOnSite(map, target, () => {
-          focusedScenarioIdRef.current = target.id;
-          focusAnimatingRef.current = false;
-          syncCompassLabel(map, target, true);
-        });
-      }
-    };
-    compassButton?.addEventListener("click", handleCompassFocus, true);
 
     fitMinZoomToBounds(map);
     map.on("resize", () => fitMinZoomToBounds(map));
@@ -393,67 +355,11 @@ export default function MapView() {
 
     mapRef.current = map;
     return () => {
-      compassButton?.removeEventListener("click", handleCompassFocus, true);
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ---- Hawaii inset ----
-  // Keep Hawaii geographically visible without forcing the primary camera to span
-  // the Pacific. The inset is intentionally non-interactive so all navigation stays
-  // with the main map.
-  useEffect(() => {
-    if (!hawaiiContainerRef.current || hawaiiMapRef.current) return;
-
-    const hawaiiMap = new maplibregl.Map({
-      container: hawaiiContainerRef.current,
-      style: BASEMAP_STYLE,
-      center: [-157.5, 20.8],
-      zoom: 4.65,
-      minZoom: 4.65,
-      maxZoom: 4.65,
-      pitch: 0,
-      bearing: 0,
-      interactive: false,
-      renderWorldCopies: false,
-      attributionControl: false,
-    });
-
-    hawaiiMapRef.current = hawaiiMap;
-    return () => {
-      hawaiiMap.remove();
-      hawaiiMapRef.current = null;
-    };
-  }, []);
-
-  // ---- keep the compass target + accessible label in sync with the active site ----
-  useEffect(() => {
-    activeStateIdRef.current = activeStateId;
-    showAllStatesRef.current = showAllStates;
-    const active = scenarios.find((scenario) => scenario.id === activeScenarioId) ?? null;
-    activeScenarioRef.current = active
-      ? { id: active.id, label: active.label, lng: active.lng, lat: active.lat }
-      : null;
-
-    if (!mapRef.current) return;
-    const compassButton = mapRef.current
-      .getContainer()
-      .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
-    if (!compassButton) return;
-
-    if (active) {
-      if (focusedScenarioIdRef.current !== active.id) {
-        focusedScenarioIdRef.current = null;
-      }
-      syncCompassLabel(mapRef.current, active, focusedScenarioIdRef.current === active.id);
-    } else {
-      compassButton.title = "Reset bearing to north";
-      compassButton.setAttribute("aria-label", "Reset bearing to north");
-      delete compassButton.dataset.focusSite;
-    }
-  }, [scenarios, activeScenarioId, activeStateId, showAllStates, mapReady]);
 
   // ---- load authoritative U.S. state boundaries used to validate proposed sites ----
   useEffect(() => {
@@ -894,174 +800,7 @@ export default function MapView() {
   // Inline style (not a Tailwind class) is required here: maplibre-gl.css ships its own
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over
   // the `absolute` utility class and collapses this container to zero height.
-  return (
-    <>
-      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
-      <div
-        aria-label="Hawaii map inset"
-        style={{
-          position: "absolute",
-          left: 12,
-          bottom: 46,
-          width: "clamp(132px, 14vw, 174px)",
-          aspectRatio: "1.42 / 1",
-          overflow: "hidden",
-          border: "1px solid rgba(255,255,255,0.72)",
-          borderRadius: 8,
-          background: "#101318",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.32)",
-          zIndex: 3,
-          pointerEvents: "none",
-        }}
-      >
-        <div ref={hawaiiContainerRef} style={{ position: "absolute", inset: 0 }} />
-        <div
-          style={{
-            position: "absolute",
-            left: 8,
-            top: 7,
-            padding: "3px 6px",
-            borderRadius: 4,
-            background: "rgba(10,13,18,0.78)",
-            color: "rgba(255,255,255,0.92)",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            lineHeight: 1,
-          }}
-        >
-          Hawaii
-        </div>
-      </div>
-    </>
-  );
-}
-
-function syncCompassLabel(
-  map: maplibregl.Map,
-  site: { label: string },
-  focused: boolean
-) {
-  const compassButton = map
-    .getContainer()
-    .querySelector<HTMLButtonElement>(".maplibregl-ctrl-compass");
-  if (!compassButton) return;
-
-  const label = focused ? `Return to state view from ${site.label}` : `Focus on ${site.label}`;
-  compassButton.title = label;
-  compassButton.setAttribute("aria-label", label);
-  compassButton.dataset.focusSite = focused ? "zoomed-in" : "ready";
-}
-
-function spiralFocusOnSite(
-  map: maplibregl.Map,
-  site: { lng: number; lat: number },
-  onDone: () => void
-) {
-  const interactionHandlers = [
-    map.dragPan,
-    map.scrollZoom,
-    map.boxZoom,
-    map.dragRotate,
-    map.keyboard,
-    map.doubleClickZoom,
-    map.touchZoomRotate,
-  ];
-  const previouslyEnabled = interactionHandlers.map((handler) => handler.isEnabled());
-
-  for (const handler of interactionHandlers) handler.disable();
-  map.stop();
-
-  const startBearing = map.getBearing();
-  const currentZoom = map.getZoom();
-  const firstZoom = Math.max(10.8, Math.min(13.2, currentZoom + 2.4));
-  const finalZoom = Math.max(15.2, Math.min(16.4, firstZoom + 3.1));
-
-  const restoreInteraction = () => {
-    interactionHandlers.forEach((handler, index) => {
-      if (previouslyEnabled[index]) handler.enable();
-    });
-    onDone();
-  };
-
-  const secondPhase = () => {
-    map.easeTo({
-      center: [site.lng, site.lat],
-      zoom: finalZoom,
-      bearing: startBearing + 320,      pitch: 52,
-      duration: 1250,
-      offset: [0, 36],
-      easing: (t) => 1 - Math.pow(1 - t, 3),
-      essential: true,
-    });
-    map.once("moveend", restoreInteraction);
-  };
-
-  map.easeTo({
-    center: [site.lng, site.lat],
-    zoom: firstZoom,
-    bearing: startBearing + 155,
-    pitch: 30,
-    duration: 950,
-    offset: [0, 18],
-    easing: (t) => t * t * (3 - 2 * t),
-    essential: true,
-  });
-  map.once("moveend", secondPhase);
-}
-
-
-function spiralZoomOutToState(
-  map: maplibregl.Map,
-  bounds: [[number, number], [number, number]],
-  onDone: () => void
-) {
-  const interactionHandlers = [
-    map.dragPan,
-    map.scrollZoom,
-    map.boxZoom,
-    map.dragRotate,
-    map.keyboard,
-    map.doubleClickZoom,
-    map.touchZoomRotate,
-  ];
-  const previouslyEnabled = interactionHandlers.map((handler) => handler.isEnabled());
-
-  for (const handler of interactionHandlers) handler.disable();
-  map.stop();
-
-  const restoreInteraction = () => {
-    interactionHandlers.forEach((handler, index) => {
-      if (previouslyEnabled[index]) handler.enable();
-    });
-    onDone();
-  };
-
-  const centerLng = (bounds[0][0] + bounds[1][0]) / 2;
-  const centerLat = (bounds[0][1] + bounds[1][1]) / 2;
-
-  map.easeTo({
-    center: [centerLng, centerLat],
-    zoom: Math.max(map.getMinZoom(), 8.5),
-    bearing: map.getBearing() + 150,
-    pitch: 24,
-    duration: 800,
-    easing: (t) => t * t * (3 - 2 * t),
-    essential: true,
-  });
-
-  map.once("moveend", () => {
-    map.fitBounds(bounds, {
-      padding: 60,
-      bearing: 0,
-      pitch: 0,
-      duration: 1050,
-      easing: (t) => 1 - Math.pow(1 - t, 3),
-      essential: true,
-    });
-    map.once("moveend", restoreInteraction);
-  });
+  return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }
 
 // A fixed minZoom that "roughly" fits the mainland view bounds only works for one window width — on a

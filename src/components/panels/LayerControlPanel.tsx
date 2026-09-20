@@ -83,6 +83,7 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}
       headerAccent="#8fa3bf"
+      draggable={false}
     >
       <div className="px-3 py-2">
         {CATEGORY_ORDER.map((cat) => {
