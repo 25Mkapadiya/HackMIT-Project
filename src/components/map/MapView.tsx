@@ -134,8 +134,11 @@ function playRippleFromWashington(map: maplibregl.Map, origin: [number, number],
   const start = performance.now();
   function frame(now: number) {
     if (runRef.current !== runId || !map.getLayer("showall-ripple-ring")) return;
-    const t = Math.min(1, (now - start) / RIPPLE_DURATION_MS);
-    const eased = EASE_OUT_CUBIC(t);
+    // Clamp to [0, 1] — a rAF timestamp can land fractionally before `start`
+    // (they aren't guaranteed to share the exact same tick), which would
+    // otherwise drive `eased` negative and make MapLibre reject circle-radius.
+    const t = Math.max(0, Math.min(1, (now - start) / RIPPLE_DURATION_MS));
+    const eased = Math.max(0, Math.min(1, EASE_OUT_CUBIC(t)));
     map.setPaintProperty("showall-ripple-ring", "circle-radius", eased * RIPPLE_MAX_RADIUS_PX);
     map.setPaintProperty("showall-ripple-ring", "circle-stroke-opacity", (1 - eased) * 0.85);
     map.setPaintProperty("showall-ripple-ring", "circle-opacity", (1 - eased) * 0.12);
@@ -193,7 +196,15 @@ export default function MapView() {
   useEffect(() => {
     if (preloadPromiseRef.current) return;
 
-    const states = getShowAllStates();
+    // Fetch in radial order from Washington so the background preload's cache
+    // fills up in roughly the same order the Show All reveal wave consumes it —
+    // nearby states are ready first, matching when they're first needed.
+    const origin = WASHINGTON.center as [number, number];
+    const states = [...getShowAllStates()].sort(
+      (a, b) =>
+        approxDistanceDeg(origin, a.center as [number, number]) -
+        approxDistanceDeg(origin, b.center as [number, number])
+    );
     const tasks: Array<() => Promise<void>> = [];
 
     for (const state of states) {
@@ -218,7 +229,11 @@ export default function MapView() {
     }
 
     preloadPromiseRef.current = (async () => {
-      const workerCount = Math.min(8, tasks.length);
+      // Higher than the old value of 8 — these all hit our own same-origin API
+      // route (not 49 different upstream hosts), so browser/HTTP2 multiplexing
+      // handles the fan-out fine, and more in-flight requests means the Show
+      // All reveal wave finds more states already cached by the time it reaches them.
+      const workerCount = Math.min(16, tasks.length);
       let nextTask = 0;
       const workers = Array.from({ length: workerCount }, async () => {
         while (nextTask < tasks.length) {
@@ -521,9 +536,13 @@ export default function MapView() {
   }, [mapReady, activeStateId, showAllStates]);
 
   // ---- load/toggle infrastructure layers ----
-  // State GeoJSON is prefetched into memory on mount. Sources/layers are added
-  // from that cache, and Show All reveals states diagonally from northwest to
-  // southeast instead of waiting for a state-by-state network waterfall.
+  // State GeoJSON is prefetched into memory on mount (see the preload effect
+  // above), but the Show All reveal never blocks on that ENTIRE nationwide
+  // preload finishing — with 49+ states that can take well over a minute. Each
+  // state instead ensures only its OWN visible layers are loaded right when its
+  // turn in the radial wave comes up, using the shared cache opportunistically
+  // and falling back to a direct fetch if the background preload hasn't reached
+  // it yet. See playRippleFromWashington / applyStateLayerVisibility above.
   const lastSyncedViewKey = useRef("");
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -551,10 +570,50 @@ export default function MapView() {
       }
     }
 
-    async function ensureLayer(state: ReturnType<typeof getEnabledStates>[number], layer: LayerDefinition) {
+    /** Adds (if missing) a hidden, zero-opacity source+layer from already-known data. Synchronous — no network. */
+    function materializeLayer(state: { id: string }, layer: LayerDefinition, data: FeatureCollection) {
       const key = `${state.id}:${layer.id}`;
       const sourceId = `src-${state.id}-${layer.id}`;
-      if (loadedLayerIds.current.has(key) || loadingLayerIds.current.has(key)) return;
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, { type: "geojson", data });
+      }
+      // Population density loads as a toggle-on layer, often after
+      // transmission-lines is already on the map (it's default-visible in
+      // most states) — without this, its fill would get added on top and
+      // visually bury the lines it's meant to give context to. Anything
+      // added later goes on top by default, so insert it before the first
+      // transmission-line layer already present, if any.
+      const insertBeforeId =
+        layer.id === "population-density"
+          ? map.getStyle().layers?.find((l) => l.id.endsWith("-transmission-lines-line"))?.id
+          : undefined;
+      for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+        if (!map.getLayer(spec.id)) {
+          map.addLayer(spec, insertBeforeId);
+          const prop = opacityPaintProp(spec.type);
+          if (prop) map.setPaintProperty(spec.id, prop, 0);
+        }
+        map.setLayoutProperty(spec.id, "visibility", "none");
+      }
+      const interactionKey = `${state.id}:${layer.id}`;
+      if (!interactivityAttached.current.has(interactionKey)) {
+        attachInteractivity(map, layer, popupRef, state.id);
+        interactivityAttached.current.add(interactionKey);
+      }
+      loadedLayerIds.current.add(key);
+    }
+
+    async function ensureLayer(state: ReturnType<typeof getEnabledStates>[number], layer: LayerDefinition) {
+      const key = `${state.id}:${layer.id}`;
+      if (loadedLayerIds.current.has(key)) return;
+      if (loadingLayerIds.current.has(key)) {
+        // Another caller (preload or a different state's wave) is already
+        // fetching this exact layer — just wait for it instead of double-fetching.
+        while (loadingLayerIds.current.has(key)) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return;
+      }
 
       loadingLayerIds.current.add(key);
       try {
@@ -567,38 +626,8 @@ export default function MapView() {
           preloadedLayerDataRef.current.set(key, data);
         }
 
-        if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
-
-        if (!map.getSource(sourceId)) {
-          map.addSource(sourceId, { type: "geojson", data });
-          const specs = buildLayerSpecs(layer, sourceId, state.id);
-          // Population density loads as a toggle-on layer, often after
-          // transmission-lines is already on the map (it's default-visible in
-          // most states) — without this, its fill would get added on top and
-          // visually bury the lines it's meant to give context to. Anything
-          // added later goes on top by default, so insert it before the first
-          // transmission-line layer already present, if any.
-          const insertBeforeId =
-            layer.id === "population-density"
-              ? map.getStyle().layers?.find((l) => l.id.endsWith("-transmission-lines-line"))?.id
-              : undefined;
-          for (const spec of specs) {
-            if (!map.getLayer(spec.id)) {
-              map.addLayer(spec, insertBeforeId);
-              map.setLayoutProperty(spec.id, "visibility", "none");
-              const prop = opacityPaintProp(spec.type);
-              if (prop) map.setPaintProperty(spec.id, prop, 0);
-            }
-          }
-
-          const interactionKey = `${state.id}:${layer.id}`;
-          if (!interactivityAttached.current.has(interactionKey)) {
-            attachInteractivity(map, layer, popupRef, state.id);
-            interactivityAttached.current.add(interactionKey);
-          }
-        }
-
-        loadedLayerIds.current.add(key);
+        if (!mapRef.current) return;
+        materializeLayer(state, layer, data);
       } catch (err) {
         console.error(`Failed to load ${state.name} layer ${layer.id}`, err);
       } finally {
@@ -606,76 +635,65 @@ export default function MapView() {
       }
     }
 
-    async function syncLayers() {
+    /** Ensures every currently-visible, non-raster layer for one state is loaded. Uses the shared cache when the background preload already has it. */
+    function ensureStateVisibleLayers(state: ReturnType<typeof getEnabledStates>[number]) {
       const tasks: Array<Promise<void>> = [];
-
-      // In Show All mode, wait for the background data preload. We deliberately
-      // do NOT pre-mount hidden MapLibre layers in a separate effect because that
-      // can race with normal state visibility and leave everything stuck hidden.
-      if (showAllStates && preloadPromiseRef.current) {
-        await preloadPromiseRef.current;
-
-        for (const state of states) {
-          for (const layer of state.layers) {
-            if (layer.geometryType === "raster") continue;
-            const key = `${state.id}:${layer.id}`;
-            if (loadedLayerIds.current.has(key)) continue;
-
-            const cachedData = preloadedLayerDataRef.current.get(key);
-            if (cachedData) {
-              const sourceId = `src-${state.id}-${layer.id}`;
-              if (!map.getSource(sourceId)) {
-                map.addSource(sourceId, { type: "geojson", data: cachedData });
-              }
-              for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
-                if (!map.getLayer(spec.id)) map.addLayer(spec);
-                map.setLayoutProperty(spec.id, "visibility", "none");
-                const prop = opacityPaintProp(spec.type);
-                if (prop) map.setPaintProperty(spec.id, prop, 0);
-              }
-
-              const interactionKey = `${state.id}:${layer.id}`;
-              if (!interactivityAttached.current.has(interactionKey)) {
-                attachInteractivity(map, layer, popupRef, state.id);
-                interactivityAttached.current.add(interactionKey);
-              }
-              loadedLayerIds.current.add(key);
-            } else if (Boolean(layerVisibility[layer.id])) {
-              // A preload request can fail independently. Retry only missing
-              // visible layers here so one bad endpoint cannot blank Show All.
-              tasks.push(ensureLayer(state, layer));
-            }
-          }
+      for (const layer of state.layers) {
+        if (layer.geometryType === "raster") continue;
+        if (!layerVisibility[layer.id]) continue;
+        const key = `${state.id}:${layer.id}`;
+        if (loadedLayerIds.current.has(key)) continue;
+        const cached = preloadedLayerDataRef.current.get(key);
+        if (cached) {
+          materializeLayer(state, layer, cached);
+        } else {
+          tasks.push(ensureLayer(state, layer));
         }
+      }
+      return Promise.all(tasks);
+    }
 
-        await Promise.all(tasks);
-      } else {
-        for (const state of states) {
-          for (const layer of state.layers) {
-            if (layer.geometryType === "raster") continue;
-            const wantVisible = Boolean(layerVisibility[layer.id]);
-            const key = `${state.id}:${layer.id}`;
-
-            if (!loadedLayerIds.current.has(key) && wantVisible) {
-              tasks.push(ensureLayer(state, layer));
-            }
-          }
+    function hideAllLayers(state: ReturnType<typeof getEnabledStates>[number]) {
+      for (const layer of state.layers) {
+        if (layer.geometryType === "raster") continue;
+        const sourceId = `src-${state.id}-${layer.id}`;
+        for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
+          if (map.getLayer(spec.id)) map.setLayoutProperty(spec.id, "visibility", "none");
         }
-        await Promise.all(tasks);
+      }
+    }
+
+    async function syncLayers() {
+      if (!showAllStates) {
+        const state = states[0]!;
+        await ensureStateVisibleLayers(state);
+        if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
+        showAllAnimationRunRef.current += 1;
+        lastShowAllAnimationKeyRef.current = "";
+        applyStateLayerVisibility(map, state, layerVisibility, "instant");
+        return;
+      }
+
+      // Opportunistically materialize whatever the background preload already
+      // has cached, for every state, right away — no network, no waiting. This
+      // is what makes returning to a previously-shown Show All view instant.
+      for (const state of states) {
+        for (const layer of state.layers) {
+          if (layer.geometryType === "raster") continue;
+          const key = `${state.id}:${layer.id}`;
+          if (loadedLayerIds.current.has(key)) continue;
+          const cached = preloadedLayerDataRef.current.get(key);
+          if (cached) materializeLayer(state, layer, cached);
+        }
       }
 
       if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
 
-      if (!showAllStates) {
-        showAllAnimationRunRef.current += 1;
-        lastShowAllAnimationKeyRef.current = "";
-        applyStateLayerVisibility(map, states[0]!, layerVisibility, "instant");
-        return;
-      }
-
       const animationKey = viewKey;
       const shouldAnimate = lastShowAllAnimationKeyRef.current !== animationKey;
       if (!shouldAnimate) {
+        await Promise.all(states.map((state) => ensureStateVisibleLayers(state)));
+        if (!mapRef.current || lastSyncedViewKey.current !== viewKey) return;
         for (const state of states) applyStateLayerVisibility(map, state, layerVisibility, "instant");
         return;
       }
@@ -688,28 +706,22 @@ export default function MapView() {
       // Idaho...) light up almost together, distant ones (Florida, Arizona...)
       // trail behind. The whole wave is bounded to REVEAL_SPAN_MS regardless of
       // how many states are live, so it never feels slower as coverage grows.
+      // Each state's own reveal only waits on ITS OWN data (usually already
+      // cached by the background preload by the time its turn comes up), never
+      // on the other 48 states.
       const origin = WASHINGTON.center as [number, number];
       const distances = states.map((state) => approxDistanceDeg(origin, state.center as [number, number]));
       const maxDistance = Math.max(...distances, 0.0001);
 
-      for (const state of states) {
-        for (const layer of state.layers) {
-          if (layer.geometryType === "raster") continue;
-          const sourceId = `src-${state.id}-${layer.id}`;
-          for (const spec of buildLayerSpecs(layer, sourceId, state.id)) {
-            if (map.getLayer(spec.id)) map.setLayoutProperty(spec.id, "visibility", "none");
-          }
-        }
-      }
-
+      for (const state of states) hideAllLayers(state);
       playRippleFromWashington(map, origin, rippleRunRef);
 
       states.forEach((state, index) => {
         const delay = REVEAL_SPAN_MS * EASE_OUT_CUBIC(distances[index]! / maxDistance);
-        window.setTimeout(() => {
-          if (showAllAnimationRunRef.current !== runId || lastSyncedViewKey.current !== viewKey) {
-            return;
-          }
+        window.setTimeout(async () => {
+          if (showAllAnimationRunRef.current !== runId || lastSyncedViewKey.current !== viewKey) return;
+          await ensureStateVisibleLayers(state);
+          if (showAllAnimationRunRef.current !== runId || lastSyncedViewKey.current !== viewKey) return;
           applyStateLayerVisibility(map, state, layerVisibility, "fade");
         }, delay);
       });
