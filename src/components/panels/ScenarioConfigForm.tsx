@@ -4,6 +4,18 @@ import type { ScenarioConfig } from "@/lib/types";
 import { SQ_FT_PER_ACRE } from "@/lib/constants/assumptions";
 import { COOLING_TECH_OPTIONS, REDUNDANCY_OPTIONS } from "@/lib/constants/options";
 
+
+const COOLING_CONFIGURATION: Record<
+  ScenarioConfig["coolingTechnology"],
+  Pick<ScenarioConfig, "loopType" | "coolingMedium">
+> = {
+  air_cooled_dx: { loopType: "closed_loop", coolingMedium: "air_cooled" },
+  chilled_water_air_cooled_chiller: { loopType: "closed_loop", coolingMedium: "water_cooled" },
+  cooling_tower_evaporative: { loopType: "open_loop", coolingMedium: "water_cooled" },
+  closed_loop_liquid: { loopType: "closed_loop", coolingMedium: "water_cooled" },
+  immersion: { loopType: "closed_loop", coolingMedium: "water_cooled" },
+};
+
 const inputCls =
   "w-full bg-base-900 border border-base-700 rounded-md px-2.5 py-1.5 text-[12.5px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent-power/50 focus:border-accent-power/50";
 const labelCls = "text-[10.5px] uppercase tracking-[0.06em] text-ink-500 mb-1 block";
@@ -66,7 +78,13 @@ export default function ScenarioConfigForm({
         <label className={labelCls}>Cooling Technology</label>
         <select
           value={scenario.coolingTechnology}
-          onChange={(e) => onChange({ coolingTechnology: e.target.value as ScenarioConfig["coolingTechnology"] })}
+          onChange={(e) => {
+            const coolingTechnology = e.target.value as ScenarioConfig["coolingTechnology"];
+            onChange({
+              coolingTechnology,
+              ...COOLING_CONFIGURATION[coolingTechnology],
+            });
+          }}
           className={inputCls}
         >
           {COOLING_TECH_OPTIONS.map((o) => (
@@ -80,34 +98,14 @@ export default function ScenarioConfigForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={labelCls}>Loop Type</label>
-          <div className="flex rounded-md border border-base-700 overflow-hidden">
-            {(["closed_loop", "open_loop"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onChange({ loopType: v })}
-                className={`flex-1 py-1.5 text-[11px] transition-colors ${
-                  scenario.loopType === v ? "bg-accent-power/20 text-accent-power" : "text-ink-500 hover:text-ink-100"
-                }`}
-              >
-                {v === "closed_loop" ? "Closed" : "Open"}
-              </button>
-            ))}
+          <div className={`${inputCls} opacity-80 cursor-default`}>
+            {scenario.loopType === "closed_loop" ? "Closed" : "Open"}
           </div>
         </div>
         <div>
           <label className={labelCls}>Cooling Medium</label>
-          <div className="flex rounded-md border border-base-700 overflow-hidden">
-            {(["air_cooled", "water_cooled"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onChange({ coolingMedium: v })}
-                className={`flex-1 py-1.5 text-[11px] transition-colors ${
-                  scenario.coolingMedium === v ? "bg-accent-water/20 text-accent-water" : "text-ink-500 hover:text-ink-100"
-                }`}
-              >
-                {v === "air_cooled" ? "Air" : "Water"}
-              </button>
-            ))}
+          <div className={`${inputCls} opacity-80 cursor-default`}>
+            {scenario.coolingMedium === "air_cooled" ? "Air" : "Water"}
           </div>
         </div>
       </div>
