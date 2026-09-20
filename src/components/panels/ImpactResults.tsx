@@ -1,6 +1,7 @@
 import type { ScenarioAnalysis } from "@/lib/types";
 import MetricRow from "@/components/ui/MetricRow";
 import DistanceRow from "@/components/ui/DistanceRow";
+import NoiseImpactCard from "@/components/ui/NoiseImpactCard";
 
 function Section({
   title,
@@ -31,7 +32,7 @@ const SEVERITY_STYLE: Record<string, string> = {
 };
 
 export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis }) {
-  const { power, fiber, regulation, efficiency, water, land, development, gaps } = analysis;
+  const { power, fiber, regulation, efficiency, water, land, noise, development, gaps } = analysis;
 
   return (
     <div className="px-3.5 py-3">
@@ -115,6 +116,10 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
         <MetricRow metric={land.populationWithin5mi} />
         <MetricRow metric={{ ...land.environmentalConstraints, value: land.environmentalConstraints.value.join(" ") }} />
       </Section>
+
+      <div className="mb-4">
+        <NoiseImpactCard noise={noise} />
+      </div>
 
       <Section title="Development" color="#c9d3e0">
         <MetricRow metric={development.acreage} />

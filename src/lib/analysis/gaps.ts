@@ -2,6 +2,7 @@ import type {
   FiberAnalysis,
   InfrastructureGap,
   LandAnalysis,
+  NoiseAnalysis,
   PowerAnalysis,
   RegulationAnalysis,
   WaterAnalysis,
@@ -18,7 +19,8 @@ export function synthesizeGaps(
   fiber: FiberAnalysis,
   regulation: RegulationAnalysis,
   water: WaterAnalysis,
-  land: LandAnalysis
+  land: LandAnalysis,
+  noise: NoiseAnalysis
 ): InfrastructureGap[] {
   const gaps: InfrastructureGap[] = [];
 
@@ -147,6 +149,24 @@ export function synthesizeGaps(
       severity: "watch",
       summary: `Nearest state highway is ${land.nearestMajorRoadMiles.value} mi away.`,
       detail: "Construction logistics and equipment delivery may require new or upgraded access roads.",
+    });
+  }
+
+  // Noise alone never disqualifies a site — it's one input to the gaps list,
+  // same as flood risk or water stress, not an automatic fail.
+  if (noise.classification === "high") {
+    gaps.push({
+      category: "community",
+      severity: "likely_required",
+      summary: "Noise impact screens as HIGH.",
+      detail: `${noise.explanation} Noise mitigation (equipment enclosures, acoustic barriers, or siting setbacks) is likely required for community acceptance and permitting.`,
+    });
+  } else if (noise.classification === "significant") {
+    gaps.push({
+      category: "community",
+      severity: "watch",
+      summary: "Noise impact screens as SIGNIFICANT.",
+      detail: `${noise.explanation} Worth a closer look during design — an acoustics consultant or community engagement early can head off permitting friction later.`,
     });
   }
 

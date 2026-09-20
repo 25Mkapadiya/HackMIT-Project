@@ -1,3 +1,32 @@
+const NOISE_CLASSIFICATION_COLOR: Record<string, string> = {
+  low: "#3bf2a0",
+  moderate: "#f2b93b",
+  significant: "#f2703b",
+  high: "#ff5470",
+  unknown: "#7d8ba0",
+};
+
+/** Compact hover summary for a proposed-site marker — score + classification only; full detail lives in the scenario panel. */
+export function buildNoisePopupHtml(
+  siteLabel: string,
+  noise: { noiseImpactScore: number | null; classification: string } | null
+): string {
+  if (!noise || noise.noiseImpactScore == null) {
+    return `
+      <div style="padding:8px 11px;min-width:150px;font-family:var(--font-inter),system-ui,sans-serif;">
+        <div style="font-size:11px;font-weight:600;color:#eef2f7;margin-bottom:2px;">${siteLabel}</div>
+        <div style="font-size:11px;color:#7d8ba0;">Noise Impact: Limited Data</div>
+      </div>`;
+  }
+  const color = NOISE_CLASSIFICATION_COLOR[noise.classification] ?? "#7d8ba0";
+  return `
+    <div style="padding:8px 11px;min-width:150px;font-family:var(--font-inter),system-ui,sans-serif;">
+      <div style="font-size:11px;font-weight:600;color:#eef2f7;margin-bottom:3px;">${siteLabel}</div>
+      <div style="font-size:12.5px;color:#eef2f7;">Noise Impact: <strong>${noise.noiseImpactScore}/100</strong></div>
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${color};margin-top:1px;">${noise.classification}</div>
+    </div>`;
+}
+
 /** Small per-layer HTML formatters for MapLibre popups. Kept deliberately simple/inline-styled since it's injected as raw HTML into a maplibre Popup. */
 export function buildPopupHtml(layerId: string, props: Record<string, unknown>): string {
   const wrap = (title: string, rows: [string, string | number | null | undefined][]) => `

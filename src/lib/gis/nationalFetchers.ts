@@ -149,6 +149,21 @@ export function getCountyDensityRecord(geoid: string | null | undefined): County
   return COUNTY_DENSITY.counties[geoid] ?? null;
 }
 
+/**
+ * Every county's density (people/sq mi) for one state, keyed by its 2-letter
+ * abbreviation — used to percentile-rank a site's county against others in
+ * the SAME state (see src/lib/analysis/noise.ts) instead of one fixed
+ * nationwide cutoff, so the score adapts to e.g. Wyoming vs. New Jersey.
+ */
+export function getCountyDensitiesForState(stateAbbreviation: string | null | undefined): number[] {
+  if (!stateAbbreviation) return [];
+  const values: number[] = [];
+  for (const record of Object.values(COUNTY_DENSITY.counties)) {
+    if (record.state === stateAbbreviation) values.push(record.densityPerSqMi);
+  }
+  return values;
+}
+
 export const COUNTY_DENSITY_VINTAGE = { year: COUNTY_DENSITY.vintage, asOf: COUNTY_DENSITY.asOf };
 
 /** Shared raw county-boundary fetch — same params every caller uses, so they hit one cache entry. */

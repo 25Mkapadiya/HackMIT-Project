@@ -19,7 +19,7 @@ import {
   emptyFeatureCollection,
 } from "./mapStyle";
 import { buildLayerSpecs, interactiveLayerIds } from "./layerStyles";
-import { buildPopupHtml } from "./popupContent";
+import { buildPopupHtml, buildNoisePopupHtml } from "./popupContent";
 
 function stateBboxParam(stateId: string): string {
   const state = getState(stateId) ?? getState(DEFAULT_STATE_ID)!;
@@ -181,6 +181,7 @@ export default function MapView() {
   // string, so they only need registering once, ever, per layer id.
   const interactivityAttached = useRef<Set<string>>(new Set());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const noiseHoverPopupRef = useRef<maplibregl.Popup | null>(null);
   const usBoundaryRef = useRef<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
@@ -901,7 +902,7 @@ export default function MapView() {
     linksSource?.setData({ type: "FeatureCollection", features });
   }, [mapReady, scenarios, analysisByScenario]);
 
-  // ---- click a proposed site marker to select it ----
+  // ---- click a proposed site marker to select it; hover shows its noise-impact screening result ----
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
@@ -909,13 +910,46 @@ export default function MapView() {
       const id = e.features?.[0]?.properties?.id as string | undefined;
       if (id) setActiveScenario(id);
     };
+    const hoverHandler = (e: maplibregl.MapLayerMouseEvent) => {
+      map.getCanvas().style.cursor = "pointer";
+      const feature = e.features?.[0];
+      const id = feature?.properties?.id as string | undefined;
+      const scenario = scenarios.find((s) => s.id === id);
+      if (!scenario || !feature) return;
+      const analysis = analysisByScenario[scenario.id];
+      const noise = analysis?.status === "ready" ? analysis.data.noise : null;
+      noiseHoverPopupRef.current?.remove();
+      noiseHoverPopupRef.current = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: "220px",
+        offset: 12,
+      })
+        .setLngLat(e.lngLat)
+        .setHTML(
+          buildNoisePopupHtml(
+            scenario.label,
+            noise ? { noiseImpactScore: noise.noiseImpactScore.value, classification: noise.classification } : null
+          )
+        )
+        .addTo(map);
+    };
+    const leaveHandler = () => {
+      map.getCanvas().style.cursor = proposeMode ? "crosshair" : "";
+      noiseHoverPopupRef.current?.remove();
+      noiseHoverPopupRef.current = null;
+    };
     map.on("click", "proposed-points-core", handler);
-    map.on("mouseenter", "proposed-points-core", () => (map.getCanvas().style.cursor = "pointer"));
-    map.on("mouseleave", "proposed-points-core", () => (map.getCanvas().style.cursor = proposeMode ? "crosshair" : ""));
+    map.on("mouseenter", "proposed-points-core", hoverHandler);
+    map.on("mouseleave", "proposed-points-core", leaveHandler);
     return () => {
       map.off("click", "proposed-points-core", handler);
+      map.off("mouseenter", "proposed-points-core", hoverHandler);
+      map.off("mouseleave", "proposed-points-core", leaveHandler);
+      noiseHoverPopupRef.current?.remove();
+      noiseHoverPopupRef.current = null;
     };
-  }, [mapReady, setActiveScenario, proposeMode]);
+  }, [mapReady, setActiveScenario, proposeMode, scenarios, analysisByScenario]);
 
   // Inline style (not a Tailwind class) is required here: maplibre-gl.css ships its own
   // `.maplibregl-map { position: relative }` rule which otherwise wins the cascade over

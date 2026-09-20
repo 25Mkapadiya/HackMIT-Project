@@ -148,6 +148,18 @@ const ROWS: { section: string; color: string; note?: string; rows: Row[] }[] = [
     section: "Environment / Community",
     color: "#3bf2a0",
     rows: [
+      {
+        label: "Noise impact",
+        get: (a) => ({
+          value:
+            a.noise.noiseImpactScore.value != null
+              ? `${a.noise.noiseImpactScore.value}/100 (${a.noise.classification})`
+              : null,
+          confidence: a.noise.noiseImpactScore.confidence,
+        }),
+        rank: (a) => a.noise.noiseImpactScore.value,
+        better: "lower",
+      },
       { label: "FEMA flood zone", get: (a) => ({ value: a.land.femaFloodZone.value, confidence: a.land.femaFloodZone.confidence }) },
       {
         label: "Environmental constraints flagged",

@@ -199,6 +199,38 @@ export interface DevelopmentEstimate {
   timelineYears: Metric<[number, number]>;
 }
 
+/** 0-24 LOW, 25-49 MODERATE, 50-74 SIGNIFICANT, 75-100 HIGH; "unknown" when residential data is unavailable. */
+export type NoiseClassification = "low" | "moderate" | "significant" | "high" | "unknown";
+
+/** 0-2 essentially none, 3-4 low, 5-6 moderate, 7-8 high, 9-10 very high. */
+export type ResidentialDensityLabel = "None" | "Low" | "Moderate" | "High" | "Very High" | "Unknown";
+
+/**
+ * Screening-level (NOT acoustics-engineering, NOT a dBA prediction) estimate
+ * of whether a proposed facility's noise is likely to matter to nearby
+ * residents — combining the selected cooling technology's relative noise
+ * potential with how much residential development actually surrounds the
+ * site. See src/lib/analysis/noise.ts for the full methodology.
+ */
+export interface NoiseAnalysis {
+  /** False only when residential density data couldn't be resolved at all (e.g. county lookup failed). */
+  available: boolean;
+  /** 1-10 relative screening weight for the selected cooling technology — not a measured dBA value. */
+  coolingNoisePotential: Metric<number>;
+  /** 0-10, percentile-ranked against other counties in the same state (not one fixed nationwide cutoff). */
+  residentialDensityScore: Metric<number | null> & { densityLabel: ResidentialDensityLabel };
+  /** 0-10. Real distance-based when a residential-proximity dataset is available; otherwise an explicitly-labeled estimate reusing the density score. */
+  residentialProximityScore: Metric<number | null> & { isEstimateFromDensity: boolean; distanceMiles: number | null };
+  /** 0-10 weighted blend: density × 0.65 + proximity × 0.35. */
+  residentialExposure: Metric<number | null>;
+  /** 0-100 = (coolingNoisePotential/10) × (residentialExposure/10) × 100, rounded. */
+  noiseImpactScore: Metric<number | null>;
+  classification: NoiseClassification;
+  isNoiseSignificant: boolean | null;
+  /** Plain-language, dynamically generated explanation of the score — not boilerplate. */
+  explanation: string;
+}
+
 export interface InfrastructureGap {
   category: LayerCategory | "power" | "water" | "fiber" | "land";
   severity: "info" | "watch" | "likely_required";
@@ -215,6 +247,7 @@ export interface ScenarioAnalysis {
   efficiency: EfficiencyAnalysis;
   water: WaterAnalysis;
   land: LandAnalysis;
+  noise: NoiseAnalysis;
   development: DevelopmentEstimate;
   gaps: InfrastructureGap[];
 }
