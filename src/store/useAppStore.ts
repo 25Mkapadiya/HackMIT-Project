@@ -146,6 +146,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateScenario: (id, patch) =>
     set((s) => ({
       scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, ...patch } : sc)),
+      // Scenario inputs changed, so any prior analysis is now stale. Do not
+      // keep showing water/power results calculated for the previous cooling
+      // technology or load configuration.
+      analysisByScenario: {
+        ...s.analysisByScenario,
+        [id]: { status: "idle" },
+      },
     })),
 
   removeScenario: (id) =>
