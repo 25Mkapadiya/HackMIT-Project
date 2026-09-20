@@ -39,9 +39,9 @@ export default function ImpactResults({ analysis }: { analysis: ScenarioAnalysis
       <Section title="Power" color="#f2b93b">
         <MetricRow metric={{ label: "Facility requirement", value: power.facilityRequirementMw, unit: "MW", confidence: "fact", source: { id: "scenario-input", name: "User-configured scenario", url: "" } }} />
         <DistanceRow label="Nearest transmission (any)" result={power.nearestTransmission} extra={power.nearestTransmission.voltageKv ? `${power.nearestTransmission.voltageKv} kV — ${power.nearestTransmission.nearestFeatureLabel ?? ""}` : undefined} />
-        <DistanceRow label="Nearest ≥115 kV" result={power.nearest115kv} extra={power.nearest115kv.voltageKv ? `${power.nearest115kv.voltageKv} kV` : undefined} />
-        <DistanceRow label="Nearest ≥230 kV" result={power.nearest230kv} extra={power.nearest230kv.voltageKv ? `${power.nearest230kv.voltageKv} kV` : undefined} />
-        <DistanceRow label="Nearest 500 kV" result={power.nearest500kv} extra={power.nearest500kv.voltageKv ? `${power.nearest500kv.voltageKv} kV` : undefined} />
+        <DistanceRow label="Nearest 115–229 kV" result={power.nearest115kv} extra={power.nearest115kv.voltageKv ? `${power.nearest115kv.voltageKv} kV` : undefined} />
+        <DistanceRow label="Nearest 230–499 kV" result={power.nearest230kv} extra={power.nearest230kv.voltageKv ? `${power.nearest230kv.voltageKv} kV` : undefined} />
+        <DistanceRow label="Nearest ≥500 kV" result={power.nearest500kv} extra={power.nearest500kv.voltageKv ? `${power.nearest500kv.voltageKv} kV` : undefined} />
         <DistanceRow
           label="Nearest substation"
           result={power.nearestSubstation}
