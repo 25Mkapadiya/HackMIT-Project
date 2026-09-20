@@ -1,7 +1,7 @@
 "use client";
 
 import type { ScenarioConfig } from "@/lib/types";
-import { COOLING_TECH_OPTIONS, REDUNDANCY_OPTIONS } from "@/lib/constants/options";
+import { COOLING_TECH_OPTIONS, REDUNDANCY_OPTIONS, getCoolingTechOption } from "@/lib/constants/options";
 
 const inputCls =
   "w-full bg-base-900 border border-base-700 rounded-md px-2.5 py-1.5 text-[12.5px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent-power/50 focus:border-accent-power/50";
@@ -14,6 +14,7 @@ export default function ScenarioConfigForm({
   scenario: ScenarioConfig;
   onChange: (patch: Partial<ScenarioConfig>) => void;
 }) {
+  const coolingTechOption = getCoolingTechOption(scenario.coolingTechnology);
   return (
     <div className="space-y-3.5">
       <div>
@@ -74,11 +75,22 @@ export default function ScenarioConfigForm({
             </option>
           ))}
         </select>
+        <div className="mt-1 text-[10px] text-ink-500">
+          Heat rejection medium: <span className="text-ink-300">{coolingTechOption.medium === "water_cooled" ? "Water" : "Air"}</span> (implied by the selected technology)
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Loop Type</label>
+      <div>
+        <label className={labelCls}>Loop Type</label>
+        {coolingTechOption.fixedLoopType ? (
+          <div
+            className="flex items-center justify-between rounded-md border border-base-800 bg-base-900/50 px-2.5 py-1.5 text-[11px] text-ink-500"
+            title={`Fixed by ${coolingTechOption.label} — this cooling technology only operates as ${coolingTechOption.fixedLoopType === "closed_loop" ? "a closed loop" : "an open loop"}.`}
+          >
+            <span className="text-ink-100">{coolingTechOption.fixedLoopType === "closed_loop" ? "Closed" : "Open"}</span>
+            <span className="text-[9.5px] uppercase tracking-[0.06em]">Fixed by technology</span>
+          </div>
+        ) : (
           <div className="flex rounded-md border border-base-700 overflow-hidden">
             {(["closed_loop", "open_loop"] as const).map((v) => (
               <button
@@ -92,23 +104,7 @@ export default function ScenarioConfigForm({
               </button>
             ))}
           </div>
-        </div>
-        <div>
-          <label className={labelCls}>Cooling Medium</label>
-          <div className="flex rounded-md border border-base-700 overflow-hidden">
-            {(["air_cooled", "water_cooled"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onChange({ coolingMedium: v })}
-                className={`flex-1 py-1.5 text-[11px] transition-colors ${
-                  scenario.coolingMedium === v ? "bg-accent-water/20 text-accent-water" : "text-ink-500 hover:text-ink-100"
-                }`}
-              >
-                {v === "air_cooled" ? "Air" : "Water"}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       <div>

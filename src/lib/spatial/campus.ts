@@ -1,6 +1,7 @@
 import * as turf from "@turf/turf";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import type { ScenarioConfig } from "@/lib/types";
+import { getCoolingTechOption } from "@/lib/constants/options";
 
 export interface BuildingProps {
   buildingIndex: number;
@@ -14,7 +15,7 @@ export interface BuildingProps {
  * schematic campus visualization, not a site plan.
  */
 export function generateCampusFootprint(scenario: ScenarioConfig): FeatureCollection<Polygon, BuildingProps> {
-  const { lng, lat, buildings, coolingMedium } = scenario;
+  const { lng, lat, buildings, coolingTechnology } = scenario;
   const n = Math.max(1, Math.min(buildings, 12));
   const cols = Math.ceil(Math.sqrt(n));
   const rows = Math.ceil(n / cols);
@@ -22,7 +23,7 @@ export function generateCampusFootprint(scenario: ScenarioConfig): FeatureCollec
   const buildingSideM = 70; // ~ illustrative hyperscale-hall footprint
   const gapM = 40;
   const cellM = buildingSideM + gapM;
-  const heightM = coolingMedium === "water_cooled" ? 16 : 14;
+  const heightM = getCoolingTechOption(coolingTechnology).medium === "water_cooled" ? 16 : 14;
 
   const features: Feature<Polygon, BuildingProps>[] = [];
   let idx = 0;

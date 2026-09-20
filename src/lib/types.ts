@@ -80,8 +80,17 @@ export interface ScenarioConfig {
   mwLoad: number;
   buildings: number;
   coolingTechnology: CoolingTechnology;
+  /**
+   * Only meaningfully a *choice* for cooling technologies whose
+   * COOLING_TECH_OPTIONS entry has fixedLoopType: null (currently just
+   * direct-to-chip liquid cooling) — every other technology has a physically
+   * fixed loop type (e.g. an evaporative cooling tower is always open, a
+   * chiller plant is always closed) and the store keeps this field in sync
+   * with that fixed value whenever coolingTechnology changes. There is no
+   * separate coolingMedium field: which medium (air/water) rejects heat is
+   * implied by coolingTechnology — see getCoolingTechOption().
+   */
   loopType: LoopType;
-  coolingMedium: CoolingMedium;
   acreageOverride?: number;
   redundancy: RedundancyAssumption["tier"];
   createdAt: string;

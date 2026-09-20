@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import type { CoolingMedium, CoolingTechnology, LoopType, ScenarioAnalysis, ScenarioConfig } from "@/lib/types";
+import type { CoolingTechnology, LoopType, ScenarioAnalysis, ScenarioConfig } from "@/lib/types";
 import { WASHINGTON } from "@/states/washington";
 import { getState, getShowAllStates, DEFAULT_STATE_ID } from "@/states/registry";
+import { getCoolingTechOption } from "@/lib/constants/options";
 
 function defaultLayerVisibility(stateId: string): Record<string, boolean> {
   const layers = getState(stateId)?.layers ?? WASHINGTON.layers;
@@ -55,12 +56,14 @@ function nextScenarioId() {
 
 const SITE_LABELS = ["Site A", "Site B", "Site C", "Site D", "Site E", "Site F"];
 
+const DEFAULT_COOLING_TECHNOLOGY: CoolingTechnology = "cooling_tower_evaporative";
+
 export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "stateId" | "lng" | "lat" | "createdAt"> = {
   mwLoad: 100,
   buildings: 3,
-  coolingTechnology: "cooling_tower_evaporative" as CoolingTechnology,
-  loopType: "closed_loop" as LoopType,
-  coolingMedium: "water_cooled" as CoolingMedium,
+  coolingTechnology: DEFAULT_COOLING_TECHNOLOGY,
+  // An evaporative cooling tower is inherently open-loop — see COOLING_TECH_OPTIONS.
+  loopType: getCoolingTechOption(DEFAULT_COOLING_TECHNOLOGY).fixedLoopType ?? ("closed_loop" as LoopType),
   redundancy: "N+1",
 };
 
@@ -120,7 +123,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateScenario: (id, patch) =>
     set((s) => ({
-      scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, ...patch } : sc)),
+      scenarios: s.scenarios.map((sc) => {
+        if (sc.id !== id) return sc;
+        const next = { ...sc, ...patch };
+        // Switching technology can move the site onto a physically fixed loop
+        // type (e.g. into/out of an evaporative cooling tower) — keep loopType
+        // truthful to that rather than leaving a stale, impossible combination.
+        if (patch.coolingTechnology) {
+          const fixedLoopType = getCoolingTechOption(patch.coolingTechnology).fixedLoopType;
+          if (fixedLoopType) next.loopType = fixedLoopType;
+        }
+        return next;
+      }),
     })),
 
   removeScenario: (id) =>
