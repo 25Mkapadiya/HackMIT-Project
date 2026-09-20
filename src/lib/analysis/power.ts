@@ -1,14 +1,55 @@
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import type { DistanceResult, PowerAnalysis, ScenarioConfig, SourceMeta } from "@/lib/types";
+import type { DemandPressureLabel, DistanceResult, PowerAnalysis, ScenarioConfig, SourceMeta } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
+import { getCountyDensityRecord } from "@/lib/gis/nationalFetchers";
 import { bboxAroundMiles, milesBetween, nearestFeature, nearestFeatureWhere, polygonContaining } from "@/lib/spatial/geo";
-import { NEARBY_GENERATION_RADIUS_MI, VOLTAGE_TIERS } from "@/lib/constants/assumptions";
+import { NEARBY_GENERATION_RADIUS_MI, POPULATION_DENSITY_TIERS, VOLTAGE_TIERS } from "@/lib/constants/assumptions";
+import { cached, TTL } from "@/lib/cache/memoryCache";
 
 interface TransmissionProps {
   XRefCd?: string;
   OperatingLineNm?: string;
   VoltageMeas?: number;
+}
+
+const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
+
+interface CensusGeographyResponse {
+  result: {
+    geographies: {
+      Counties?: { NAME: string; GEOID: string }[];
+    };
+  };
+}
+
+/**
+ * Same Census geocoder endpoint (and cache key format) regulation.ts's
+ * reverseGeocodeCounty uses — sharing the key means whichever of the two
+ * analysis steps runs first populates the cache for the other, so this
+ * never costs a second network round trip per scenario.
+ */
+async function getCountyGeoid(lng: number, lat: number): Promise<{ geoid: string; name: string } | null> {
+  const url = `https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties&format=json`;
+  try {
+    const data = await cached(`county:${lng.toFixed(3)},${lat.toFixed(3)}`, TTL.ONE_DAY, async () => {
+      const res = await fetch(url, { headers: { "User-Agent": UA }, cache: "no-store" });
+      if (!res.ok) throw new Error(`Census geocoder failed (${res.status})`);
+      return (await res.json()) as CensusGeographyResponse;
+    });
+    const county = data.result.geographies.Counties?.[0];
+    return county ? { geoid: county.GEOID, name: county.NAME } : null;
+  } catch {
+    return null;
+  }
+}
+
+function demandPressureLabelFor(densityPerSqMi: number | null): DemandPressureLabel {
+  if (densityPerSqMi == null) return "Unknown";
+  if (densityPerSqMi >= POPULATION_DENSITY_TIERS.high) return "Very High";
+  if (densityPerSqMi >= POPULATION_DENSITY_TIERS.moderate) return "High";
+  if (densityPerSqMi >= POPULATION_DENSITY_TIERS.low) return "Moderate";
+  return "Low";
 }
 
 function toDistanceResult(
@@ -34,7 +75,7 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
   const territoryBbox = bboxAroundMiles(lng, lat, 20);
   const generationBbox = bboxAroundMiles(lng, lat, NEARBY_GENERATION_RADIUS_MI);
 
-  const [transmissionFc, territoryFc, generationFc] = await Promise.all([
+  const [transmissionFc, territoryFc, generationFc, county] = await Promise.all([
     getFetcher(stateId, "transmission-lines")(transmissionBbox) as Promise<FeatureCollection<Geometry, TransmissionProps>>,
     getFetcher(stateId, "utility-territories")(territoryBbox) as Promise<
       FeatureCollection<Geometry, { Name?: string }>
@@ -42,7 +83,11 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
     getFetcher(stateId, "power-plants")(generationBbox) as Promise<
       FeatureCollection<Geometry, { plantName?: string; fuel?: string; nameplateMw?: number }>
     >,
+    getCountyGeoid(lng, lat),
   ]);
+
+  const densityRecord = getCountyDensityRecord(county?.geoid);
+  const demandPressureLabel = demandPressureLabelFor(densityRecord?.densityPerSqMi ?? null);
 
   const nearestAny = toDistanceResult(nearestFeature(lng, lat, transmissionFc), bundle.transmissionSource);
   const nearest115 = toDistanceResult(
@@ -109,6 +154,21 @@ export async function computePowerAnalysis(scenario: ScenarioConfig): Promise<Po
         "Substation and feeder headroom are not published data. Transmission-line proximity indicates access to the grid, not available capacity.",
         "A formal interconnection study by the transmission owner / serving utility is required to determine actual available capacity.",
       ],
+    },
+    gridDemandPressure: {
+      label: "Existing grid demand pressure (county population density)",
+      value: densityRecord
+        ? { countyName: county?.name ?? densityRecord.name, densityPerSqMi: densityRecord.densityPerSqMi }
+        : null,
+      confidence: densityRecord ? "estimated" : "unknown",
+      source: NATIONAL_SOURCES.censusCountyDensity,
+      demandPressureLabel,
+      caveats: densityRecord
+        ? [
+            `${densityRecord.name}, ${densityRecord.state} has roughly ${Math.round(densityRecord.densityPerSqMi).toLocaleString()} people/sq mi — ${demandPressureLabel.toLowerCase()} existing residential/commercial demand likely already sharing capacity on the local transmission and distribution system.`,
+            "A proxy for competing local load, not measured substation/feeder headroom — a nearby high-voltage line does not guarantee available capacity in a dense county.",
+          ]
+        : ["County could not be determined for this location — demand-pressure context is unavailable."],
     },
     likelyAction: {
       label: "Likely next step",

@@ -8,6 +8,7 @@ import {
   fetchColocationFacilities,
   fetchFemaFloodZones,
   fetchPopulationTracts,
+  fetchCountyPopulationDensity,
   fetchEiaPowerPlants,
   fetchHifldTransmissionLines,
   fetchHifldUtilityTerritories,
@@ -56,6 +57,7 @@ export function buildStandardStateLayerFetchers(
     "colocation-facilities": (bbox) => fetchColocationFacilities(bbox, stateAbbr),
     "flood-zones": fetchFemaFloodZones,
     "population-tracts": fetchPopulationTracts,
+    "population-density": fetchCountyPopulationDensity,
     "data-centers": fetchDataCenters,
     "power-plants": (bbox) => fetchEiaPowerPlants(bbox, stateAbbr),
   };

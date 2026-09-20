@@ -47,6 +47,35 @@ export function buildLayerSpecs(
     ];
   }
 
+  if (layer.id === "population-density") {
+    // Sequential choropleth by county population density (people/sq mi). Bucketed
+    // to match POPULATION_DENSITY_TIERS in src/lib/constants/assumptions.ts, so
+    // the map legend and the analysis engine's "grid demand pressure" tiers agree.
+    const densityColor: DataDrivenPropertyValueSpecification<string> = [
+      "step",
+      ["coalesce", ["get", "PopulationDensityPerSqMi"], -1],
+      "#3a4658", // no data
+      0, "#d8e6f2",
+      25, "#9dc3e6",
+      150, "#4f81bd",
+      1000, "#1f3864",
+    ];
+    return [
+      {
+        id: `${mapLayerId}-fill`,
+        type: "fill",
+        source: sourceId,
+        paint: { "fill-color": densityColor, "fill-opacity": 0.55 },
+      },
+      {
+        id: `${mapLayerId}-outline`,
+        type: "line",
+        source: sourceId,
+        paint: { "line-color": "#0a0d12", "line-width": 0.4, "line-opacity": 0.4 },
+      },
+    ];
+  }
+
   if (layer.id === "flood-zones") {
     return [
       {

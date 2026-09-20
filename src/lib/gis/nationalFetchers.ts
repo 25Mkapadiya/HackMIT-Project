@@ -3,6 +3,7 @@ import { queryArcGisGeoJSON, type Bbox } from "./arcgis";
 import { cached, TTL } from "@/lib/cache/memoryCache";
 import * as turf from "@turf/turf";
 import { NATIONAL_SOURCES } from "./nationalSources";
+import countyPopulationDensityData from "./data/countyPopulationDensity.json";
 
 const UA = "Mozilla/5.0 (compatible; DataCenterSitingPlatform/1.0; +https://vercel.com)";
 
@@ -125,6 +126,61 @@ export async function fetchPopulationTracts(bbox: Bbox) {
     { bbox, outFields: "GEOID,NAME,BASENAME,STATE,COUNTY,TRACT", maxAllowableOffset: generalizationFor(bbox) },
     TTL.ONE_DAY
   );
+}
+
+export interface CountyDensityRecord {
+  name: string;
+  state: string;
+  population: number;
+  landAreaSqMi: number;
+  densityPerSqMi: number;
+}
+
+interface CountyDensityDataset {
+  vintage: number;
+  asOf: string;
+  counties: Record<string, CountyDensityRecord>;
+}
+
+const COUNTY_DENSITY = countyPopulationDensityData as CountyDensityDataset;
+
+export function getCountyDensityRecord(geoid: string | null | undefined): CountyDensityRecord | null {
+  if (!geoid) return null;
+  return COUNTY_DENSITY.counties[geoid] ?? null;
+}
+
+export const COUNTY_DENSITY_VINTAGE = { year: COUNTY_DENSITY.vintage, asOf: COUNTY_DENSITY.asOf };
+
+/**
+ * County polygons (live TIGERweb, layer 82 in tigerWMS_Current) with population
+ * density joined in by GEOID from the precomputed Gazetteer+PEP dataset (see
+ * scripts/county_population_density.py). Boundaries are always live/current;
+ * only the density figures are a static annual snapshot.
+ */
+export async function fetchCountyPopulationDensity(bbox: Bbox): Promise<FeatureCollection<Geometry, Record<string, unknown>>> {
+  const fc = await queryArcGisGeoJSON<{ GEOID?: string; NAME?: string; STATE?: string }>(
+    NATIONAL_SOURCES.censusTiger.url + "/82",
+    { bbox, outFields: "GEOID,NAME,STATE", maxAllowableOffset: generalizationFor(bbox) },
+    TTL.ONE_DAY
+  );
+  return {
+    type: "FeatureCollection",
+    features: fc.features.map((f) => {
+      const geoid = f.properties?.GEOID ?? null;
+      const record = getCountyDensityRecord(geoid);
+      return {
+        ...f,
+        properties: {
+          GEOID: geoid,
+          CountyName: record?.name ?? f.properties?.NAME ?? null,
+          State: record?.state ?? null,
+          Population: record?.population ?? null,
+          LandAreaSqMi: record?.landAreaSqMi ?? null,
+          PopulationDensityPerSqMi: record?.densityPerSqMi ?? null,
+        },
+      };
+    }),
+  };
 }
 
 // ------------------------------------------------------------------ POWER (nationwide)

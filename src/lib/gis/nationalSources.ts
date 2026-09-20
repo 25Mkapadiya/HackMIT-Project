@@ -139,6 +139,24 @@ export const NATIONAL_SOURCES = {
     refreshFrequency: "Static snapshot (downloaded from HIFLD 2025-08-21; source dataset will not be updated further)",
     methodology: "Point-in-polygon lookup against nationwide retail electric service territory boundaries.",
   },
+  /**
+   * County-level population density, built by scripts/county_population_density.py
+   * (Census Gazetteer land area ÷ Population Estimates Program headcount) and
+   * bundled as a static asset — see src/lib/gis/data/countyPopulationDensity.json.
+   * Joined at request time to live TIGERweb county polygons by GEOID. Used both
+   * as a "community" map layer and, in power.ts, as a proxy for how much
+   * existing residential/commercial load is already competing for headroom on
+   * the local grid near a proposed site.
+   */
+  censusCountyDensity: {
+    id: "census-county-population-density",
+    name: "US Census Bureau — County Population Density (PEP + Gazetteer)",
+    url: "https://www2.census.gov/programs-surveys/popest/datasets/",
+    license: "Public domain (US Census Bureau)",
+    refreshFrequency: "Annual (Population Estimates Program vintage; land area from the Census Gazetteer)",
+    methodology:
+      "County population (Census Bureau Population Estimates Program, most recent published vintage) divided by land area (Census Gazetteer ALAND_SQMI) to give people per square mile, joined to live TIGERweb county boundaries by GEOID. A higher-density county carries more existing residential/commercial demand on the same distribution and transmission system, which is one factor (not a substitute for a utility interconnection study) in how much headroom may remain for a new large load.",
+  },
   usDroughtMonitor: {
     id: "us-drought-monitor",
     name: "U.S. Drought Monitor — Current Conditions",
