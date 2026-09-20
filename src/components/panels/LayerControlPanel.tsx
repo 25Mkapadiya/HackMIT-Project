@@ -53,6 +53,7 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
   const layerVisibility = useAppStore((s) => s.layerVisibility);
   const toggleLayer = useAppStore((s) => s.toggleLayer);
   const resetLayerVisibility = useAppStore((s) => s.resetLayerVisibility);
+  const resetCamera = useAppStore((s) => s.resetCamera);
   const activeStateId = useAppStore((s) => s.activeStateId);
   const showAllStates = useAppStore((s) => s.showAllStates);
   const activeLayers = showAllStates
@@ -87,9 +88,12 @@ export default function LayerControlPanel({ collapsed, onToggleCollapse }: { col
     >
       <div className="px-3 pt-2 pb-1 flex justify-end">
         <button
-          onClick={resetLayerVisibility}
+          onClick={() => {
+            resetLayerVisibility();
+            resetCamera();
+          }}
           className="text-[10.5px] font-medium text-ink-500 hover:text-ink-100 hover:bg-base-800 px-2 py-1 rounded-md transition-colors"
-          title="Reset every layer's visibility back to this state's defaults"
+          title="Reset layer visibility and re-center the map on this view's default framing"
         >
           Return to Default
         </button>

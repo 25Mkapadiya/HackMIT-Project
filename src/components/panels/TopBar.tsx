@@ -26,7 +26,7 @@ export default function TopBar() {
   const subtitle = showAllStates
     ? `Showing all ${implementedStates.length} implemented states`
     : activeState?.enabled
-      ? "Data Center Siting Intelligence"
+      ? ""
       : `${activeState?.name ?? "Selected state"} — coming soon, showing Washington's live analysis`;
 
   const sortedStates = useMemo(
@@ -74,13 +74,13 @@ export default function TopBar() {
     <div className="absolute top-0 left-0 right-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 h-14 glass-panel border-b border-base-700">
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-accent-power to-accent-proposed flex items-center justify-center text-[13px] font-bold text-base-950">
-            G
+          <div className="shrink-0 rounded-md bg-white px-1.5 py-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.png" alt="GEO: Graphical Energy Outcomes" className="h-6 w-auto block" />
           </div>
-          <div className="leading-tight">
-            <div className="text-[13px] font-semibold text-ink-100 tracking-tight">GEO: Graphical Energy Outcomes</div>
-            <div className="text-[9.5px] text-ink-500 tracking-wide -mt-0.5 truncate max-w-[240px]">{subtitle}</div>
-          </div>
+          {subtitle && (
+            <div className="text-[9.5px] text-ink-500 tracking-wide truncate max-w-[220px]">{subtitle}</div>
+          )}
         </div>
 
         <div

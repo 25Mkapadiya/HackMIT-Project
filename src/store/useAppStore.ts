@@ -26,6 +26,12 @@ interface AppState {
   toggleLayer: (id: string) => void;
   resetLayerVisibility: () => void;
 
+  // Bumped whenever the camera should snap back to the current view's default
+  // framing (e.g. "Return to Default"), even if activeStateId/showAllStates
+  // haven't changed — MapView watches this to re-run fitBounds on demand.
+  cameraResetToken: number;
+  resetCamera: () => void;
+
   // propose-mode
   proposeMode: boolean;
   setProposeMode: (v: boolean) => void;
@@ -106,6 +112,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { layerVisibility: merged };
     }),
+
+  cameraResetToken: 0,
+  resetCamera: () => set((s) => ({ cameraResetToken: s.cameraResetToken + 1 })),
 
   proposeMode: false,
   setProposeMode: (v) => set({ proposeMode: v }),

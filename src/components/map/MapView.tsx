@@ -501,10 +501,14 @@ export default function MapView() {
 
   // ---- state / all-implemented-states camera ----
   const lastCameraTargetRef = useRef(`state:${activeStateId}`);
+  const lastCameraResetTokenRef = useRef(0);
+  const cameraResetToken = useAppStore((s) => s.cameraResetToken);
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const cameraTarget = showAllStates ? "all-implemented" : `state:${activeStateId}`;
-    if (cameraTarget === lastCameraTargetRef.current) return;
+    const resetRequested = cameraResetToken !== lastCameraResetTokenRef.current;
+    if (cameraTarget === lastCameraTargetRef.current && !resetRequested) return;
+    lastCameraResetTokenRef.current = cameraResetToken;
 
     if (showAllStates) {
       // Extra top padding (vs. the other sides) leaves room above the fitted
@@ -519,7 +523,7 @@ export default function MapView() {
       if (state) mapRef.current.fitBounds(state.bounds, { padding: 60, duration: 1200 });
     }
     lastCameraTargetRef.current = cameraTarget;
-  }, [mapReady, activeStateId, showAllStates]);
+  }, [mapReady, activeStateId, showAllStates, cameraResetToken]);
 
   // ---- load/toggle infrastructure layers ----
   // State GeoJSON is prefetched into memory on mount (see the preload effect
