@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import type { ScenarioConfig } from "@/lib/types";
 import DraggablePanel from "@/components/ui/DraggablePanel";
-import { BASE_PUE_BY_COOLING_TECH, COOLING_TECH_TO_WUE_KEY, WUE_L_PER_KWH } from "@/lib/constants/assumptions";
+import { BASE_PUE_BY_COOLING_TECH, GALLONS_PER_LITER } from "@/lib/constants/assumptions";
+import { computeWaterUsageModel } from "@/lib/analysis/water";
 import { EU_COUNTRIES, EU_VARIABLES, type EuVariable } from "@/lib/data/euDataCentres";
 
 const W = 420;
@@ -52,18 +53,24 @@ function VarSelect({ label, value, onChange }: { label: string; value: string; o
 
 /**
  * Values for a user-proposed site, derived from its scenario config with the same model
- * assumptions the analysis engine uses. ERF/REF aren't modelled, so they're omitted.
+ * the Water panel uses (computeWaterUsageModel), so the two surfaces never disagree on a
+ * site's water usage. ERF/REF aren't modelled, so they're omitted.
  */
 function scenarioValues(s: ScenarioConfig, analysisPue: number | null): Record<string, number> {
   // Prefer the analysis's modeled PUE once it has run; otherwise the cooling technology's base PUE.
   const pue = analysisPue ?? BASE_PUE_BY_COOLING_TECH[s.coolingTechnology]?.value ?? 1.4;
-  const wueKey = COOLING_TECH_TO_WUE_KEY[s.coolingTechnology] ?? "us_average";
-  const wue = WUE_L_PER_KWH[wueKey]?.value ?? WUE_L_PER_KWH.us_average.value;
   const edcKwh = s.mwLoad * 1000 * pue * 8760;
+
+  const water = computeWaterUsageModel(s.mwLoad, s.coolingTechnology);
+  const winLitersPerYear = (water.consumptionGalPerDay * 365) / GALLONS_PER_LITER;
+  const itEnergyKwhPerYear = water.itEnergyKwhPerDay * 365;
+  // WUE is defined as water use per unit of IT-equipment energy (not PUE-adjusted facility energy).
+  const wue = itEnergyKwhPerYear > 0 ? winLitersPerYear / itEnergyKwhPerYear : 0;
+
   return {
     pdit: s.mwLoad,
     edc: edcKwh / 1e6,
-    win: (edcKwh * wue) / 1000,
+    win: winLitersPerYear / 1000,
     pue,
     wue,
   };

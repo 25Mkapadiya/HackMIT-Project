@@ -6,61 +6,6 @@
  * MODEL ESTIMATE, never FACT.
  */
 
-/** Water Usage Effectiveness (WUE): liters of water per kWh of IT energy. */
-export const WUE_L_PER_KWH = {
-  us_average: {
-    value: 1.8,
-    label: "Evaporative-cooled reference",
-    description:
-      "Reference site WUE for an evaporative-cooled data center. WUE is site water use divided by IT-equipment energy, so it must be applied to IT kWh rather than PUE-adjusted facility kWh.",
-  },
-  best_in_class: {
-    value: 0.19,
-    label: "Low-water reference",
-    description:
-      "Low-water industry reference retained for comparison; not used as the default for dry heat-rejection technologies.",
-  },
-  air_cooled_dx: {
-    value: 0,
-    label: "Air-cooled DX / dry heat rejection",
-    description:
-      "Routine cooling-process site water use is modeled as effectively zero because heat is rejected directly to air without an evaporative cooling tower. Domestic, humidification, fire-system, and one-time fill water are outside this cooling model.",
-  },
-  chilled_water_air_cooled_chiller: {
-    value: 0,
-    label: "Chilled water + air-cooled chiller",
-    description:
-      "The chilled-water loop is closed and heat is rejected by dry air-cooled chillers, so routine cooling-process make-up water is modeled as effectively zero. One-time loop fill and non-cooling facility water are excluded.",
-  },
-  cooling_tower_evaporative: {
-    value: 1.8,
-    label: "Evaporative cooling tower",
-    description:
-      "Site-WUE reference for conventional evaporative cooling. Applied to IT-equipment energy, consistent with the WUE definition.",
-  },
-  closed_loop_liquid: {
-    value: 0,
-    label: "Closed-loop liquid / direct-to-chip with dry rejection",
-    description:
-      "A sealed liquid loop with dry heat rejection is modeled as having effectively zero routine cooling-process make-up water. Initial fill, maintenance losses, and non-cooling facility water are excluded.",
-  },
-  immersion: {
-    value: 0,
-    label: "Immersion cooling with dry rejection",
-    description:
-      "Immersion cooling paired with dry heat rejection is modeled as having effectively zero routine cooling-process site water use. Non-cooling facility water is excluded.",
-  },
-} satisfies Record<string, { value: number; label: string; description: string }>;
-
-/** Maps the UI's cooling technology selector to a WUE coefficient key above. */
-export const COOLING_TECH_TO_WUE_KEY: Record<string, keyof typeof WUE_L_PER_KWH> = {
-  air_cooled_dx: "air_cooled_dx",
-  chilled_water_air_cooled_chiller: "chilled_water_air_cooled_chiller",
-  cooling_tower_evaporative: "cooling_tower_evaporative",
-  closed_loop_liquid: "closed_loop_liquid",
-  immersion: "immersion",
-};
-
 export const GALLONS_PER_LITER = 0.264172;
 
 /**

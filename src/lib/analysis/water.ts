@@ -1,5 +1,5 @@
 import type { FeatureCollection, Geometry } from "geojson";
-import type { ScenarioConfig, WaterAnalysis } from "@/lib/types";
+import type { CoolingTechnology, ScenarioConfig, WaterAnalysis } from "@/lib/types";
 import { getFetcher, getStateGisBundle } from "@/lib/gis/stateGis";
 import { NATIONAL_SOURCES } from "@/lib/gis/nationalSources";
 import { bboxAroundMiles, featuresWithinRadius, nearestFeature, polygonContaining } from "@/lib/spatial/geo";
@@ -66,34 +66,26 @@ export async function computeWaterStressContext(
   return { waterStress };
 }
 
-export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<WaterAnalysis> {
-  const { lng, lat, mwLoad, coolingTechnology, stateId } = scenario;
-  const bundle = getStateGisBundle(stateId);
-  const hasWaterRightsLayer = Boolean(bundle.fetchers["water-diversions"]);
+export interface WaterUsageModel {
+  consumptionGalPerDay: number;
+  withdrawalGalPerDay: number;
+  itEnergyKwhPerDay: number;
+  closedLoopVolumeGal: number;
+  evaporativePeakMakeupGalPerDay: number;
+  evaporativePeakBlowdownGalPerDay: number;
+  isEvaporative: boolean;
+  isClosedChilledWater: boolean;
+  waterModelLabel: string;
+  waterModelSource: { id: string; name: string; url: string; methodology: string };
+}
 
-  const waterBbox = bboxAroundMiles(lng, lat, 15);
-  const rightsBbox = bboxAroundMiles(lng, lat, 10);
-  const droughtBbox = bboxAroundMiles(lng, lat, 20);
-
-  const [riversFc, waterbodiesFc, rightsFc, droughtFc] = await Promise.all([
-    getFetcher(stateId, "hydrography-rivers")(waterBbox) as Promise<FeatureCollection<Geometry, { GNIS_Name?: string }>>,
-    getFetcher(stateId, "hydrography-waterbodies")(waterBbox) as Promise<
-      FeatureCollection<Geometry, { GNIS_Name?: string }>
-    >,
-    getFetcher(stateId, "water-diversions")(rightsBbox) as Promise<FeatureCollection<Geometry, Record<string, unknown>>>,
-    getFetcher(stateId, "drought-areas")(droughtBbox) as Promise<FeatureCollection<Geometry, { DM?: number }>>,
-  ]);
-
-  const combinedWater: FeatureCollection<Geometry, { GNIS_Name?: string }> = {
-    type: "FeatureCollection",
-    features: [...riversFc.features, ...waterbodiesFc.features],
-  };
-  const nearestWater = nearestFeature(lng, lat, combinedWater);
-
-  const rightsNearby = featuresWithinRadius(lng, lat, rightsFc, 10);
-  const droughtFeature = polygonContaining(lng, lat, droughtFc);
-  const { waterStress, droughtStatusText } = deriveWaterStress(droughtFeature, rightsNearby.length);
-
+/**
+ * Pure cooling-water usage model shared by the Water panel
+ * (computeWaterAnalysis, below) and the comparison graph (GraphPanel), so
+ * both surfaces report the same number for the same scenario. Depends only
+ * on load and cooling technology — no GIS/network calls.
+ */
+export function computeWaterUsageModel(mwLoad: number, coolingTechnology: CoolingTechnology): WaterUsageModel {
   const isAirCooledDx = coolingTechnology === "air_cooled_dx";
   const isClosedChilledWater = coolingTechnology === "chilled_water_air_cooled_chiller";
   const isEvaporative = coolingTechnology === "cooling_tower_evaporative";
@@ -181,6 +173,60 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
           methodology:
             "Dry heat-rejection / closed-loop cooling is modeled with virtually zero routine cooling-process water because water is not intentionally evaporated.",
         };
+
+  return {
+    consumptionGalPerDay,
+    withdrawalGalPerDay,
+    itEnergyKwhPerDay,
+    closedLoopVolumeGal,
+    evaporativePeakMakeupGalPerDay,
+    evaporativePeakBlowdownGalPerDay,
+    isEvaporative,
+    isClosedChilledWater,
+    waterModelLabel,
+    waterModelSource,
+  };
+}
+
+export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<WaterAnalysis> {
+  const { lng, lat, mwLoad, coolingTechnology, stateId } = scenario;
+  const bundle = getStateGisBundle(stateId);
+  const hasWaterRightsLayer = Boolean(bundle.fetchers["water-diversions"]);
+
+  const waterBbox = bboxAroundMiles(lng, lat, 15);
+  const rightsBbox = bboxAroundMiles(lng, lat, 10);
+  const droughtBbox = bboxAroundMiles(lng, lat, 20);
+
+  const [riversFc, waterbodiesFc, rightsFc, droughtFc] = await Promise.all([
+    getFetcher(stateId, "hydrography-rivers")(waterBbox) as Promise<FeatureCollection<Geometry, { GNIS_Name?: string }>>,
+    getFetcher(stateId, "hydrography-waterbodies")(waterBbox) as Promise<
+      FeatureCollection<Geometry, { GNIS_Name?: string }>
+    >,
+    getFetcher(stateId, "water-diversions")(rightsBbox) as Promise<FeatureCollection<Geometry, Record<string, unknown>>>,
+    getFetcher(stateId, "drought-areas")(droughtBbox) as Promise<FeatureCollection<Geometry, { DM?: number }>>,
+  ]);
+
+  const combinedWater: FeatureCollection<Geometry, { GNIS_Name?: string }> = {
+    type: "FeatureCollection",
+    features: [...riversFc.features, ...waterbodiesFc.features],
+  };
+  const nearestWater = nearestFeature(lng, lat, combinedWater);
+
+  const rightsNearby = featuresWithinRadius(lng, lat, rightsFc, 10);
+  const droughtFeature = polygonContaining(lng, lat, droughtFc);
+  const { waterStress, droughtStatusText } = deriveWaterStress(droughtFeature, rightsNearby.length);
+
+  const {
+    consumptionGalPerDay,
+    withdrawalGalPerDay,
+    closedLoopVolumeGal,
+    evaporativePeakMakeupGalPerDay,
+    evaporativePeakBlowdownGalPerDay,
+    isEvaporative,
+    isClosedChilledWater,
+    waterModelLabel,
+    waterModelSource,
+  } = computeWaterUsageModel(mwLoad, coolingTechnology);
 
   return {
     estimatedConsumptionGalPerDay: {
