@@ -191,6 +191,7 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
           : [
               "ASHRAE describes dry closed-loop heat rejection as virtually zero-water for cooling. This excludes domestic water, humidification, fire systems, commissioning fills, leaks, and optional adiabatic assist.",
             ],
+    },
     estimatedWithdrawalGalPerDay: {
       label: isEvaporative ? "Estimated cooling-water makeup" : "Annualized cooling-water supply",
       value: Math.round(withdrawalGalPerDay),
@@ -204,6 +205,7 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
         : isClosedChilledWater
           ? ["Annualized average; actual closed-loop makeup/refill occurs during maintenance or small loss events, not as a steady withdrawal."]
           : ["No routine cooling-water withdrawal is modeled for dry heat rejection."],
+    },
     nearestWaterBody: {
       distanceMiles: nearestWater.distanceMiles,
       nearestFeatureLabel: nearestWater.feature?.properties?.GNIS_Name ?? (nearestWater.feature ? "Unnamed waterway" : null),
