@@ -69,7 +69,7 @@ const SITE_LABELS = ["Site A", "Site B", "Site C", "Site D", "Site E", "Site F"]
 export const DEFAULT_SCENARIO_DEFAULTS: Omit<ScenarioConfig, "id" | "label" | "stateId" | "lng" | "lat" | "createdAt"> = {
   mwLoad: 100,
   buildings: 3,
-  coolingTechnology: "cooling_tower_evaporative" as CoolingTechnology,
+  coolingTechnology: "chilled_water_air_cooled_chiller" as CoolingTechnology,
   loopType: "closed_loop" as LoopType,
   coolingMedium: "water_cooled" as CoolingMedium,
   redundancy: "N+1",
