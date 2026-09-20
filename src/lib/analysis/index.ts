@@ -13,8 +13,8 @@ import { synthesizeGaps } from "./gaps";
  * POWER -> FIBER -> REGULATION -> EFFICIENCY -> WATER -> LAND.
  * Regulation reuses the utility territory already resolved by the power step,
  * and efficiency reuses power's population-density lookup (no extra Census
- * geocoder call) to model a site-specific PUE — which water then uses for its
- * consumption/withdrawal figures instead of a flat assumed PUE. Every other
+ * geocoder call) to model a site-specific PUE. Water is calculated independently
+ * from IT-equipment energy because WUE is defined per kWh of IT energy, not facility energy. Every other
  * step is independent and could be parallelized later without changing results.
  */
 export async function runScenarioAnalysis(scenario: ScenarioConfig): Promise<ScenarioAnalysis> {
@@ -22,7 +22,7 @@ export async function runScenarioAnalysis(scenario: ScenarioConfig): Promise<Sce
   const fiber = await computeFiberAnalysis(scenario);
   const regulation = await computeRegulationAnalysis(scenario, power.utilityTerritory.value);
   const efficiency = await computeEfficiencyAnalysis(scenario, power);
-  const water = await computeWaterAnalysis(scenario, efficiency.estimatedPue.value);
+  const water = await computeWaterAnalysis(scenario);
   const land = await computeLandAnalysis(scenario);
 
   const development = computeDevelopmentEstimate(scenario, land);
