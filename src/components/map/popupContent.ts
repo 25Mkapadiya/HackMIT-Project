@@ -19,6 +19,12 @@ export function buildPopupHtml(layerId: string, props: Record<string, unknown>):
       return wrap("Transmission Line", [
         ["Line", (props.OperatingLineNm as string) || (props.XRefCd as string) || "Unnamed"],
         ["Voltage", props.VoltageMeas ? `${props.VoltageMeas} kV` : "Unknown"],
+        [
+          "Local pop. density",
+          props.PopulationDensityPerSqMi
+            ? `${Math.round(props.PopulationDensityPerSqMi as number).toLocaleString()} / sq mi`
+            : "Rural / unavailable",
+        ],
       ]);
     case "utility-territories":
       return wrap("Utility Territory", [["Utility", (props.Name as string) || "Unknown"]]);

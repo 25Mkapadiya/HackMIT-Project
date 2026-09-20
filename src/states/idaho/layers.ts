@@ -189,14 +189,14 @@ export const ID_LAYERS: LayerDefinition[] = [
     source: ID_SOURCES.censusCountyDensity,
     confidence: "estimated",
     description:
-      "County-level population density (people per sq mi), combining Census Population Estimates with Gazetteer land area. Denser counties tend to carry more existing residential/commercial load on the local grid, competing with a new large facility for available transmission and substation headroom.",
+      "County-level population density (people per sq mi), combining Census Population Estimates with Gazetteer land area, shown as a quiet background wash (no highlight below 25/sq mi). Denser counties tend to carry more existing residential/commercial load on the local grid, competing with a new large facility for available transmission and substation headroom — the same amber-to-red \"demand pressure\" scale also appears as a soft glow along transmission lines that run through these counties.",
     defaultVisible: false,
     endpoint: "/api/gis/population-density",
     legend: [
-      { label: "< 25 / sq mi (rural)", color: "#d8e6f2", swatch: "fill" },
-      { label: "25–150 / sq mi (suburban)", color: "#9dc3e6", swatch: "fill" },
-      { label: "150–1,000 / sq mi (urban)", color: "#4f81bd", swatch: "fill" },
-      { label: "1,000+ / sq mi (dense urban)", color: "#1f3864", swatch: "fill" },
+      { label: "< 25 / sq mi — no highlight (rural)", color: "#2a3342", swatch: "fill" },
+      { label: "25–150 / sq mi (suburban)", color: "#f2b93b", swatch: "fill" },
+      { label: "150–1,000 / sq mi (urban)", color: "#f2703b", swatch: "fill" },
+      { label: "1,000+ / sq mi (dense urban)", color: "#ff5470", swatch: "fill" },
     ],
   },
 

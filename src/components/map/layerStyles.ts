@@ -1,5 +1,17 @@
 import type { DataDrivenPropertyValueSpecification, LayerSpecification } from "maplibre-gl";
 import type { LayerDefinition } from "@/lib/types";
+import { POPULATION_DENSITY_TIERS } from "@/lib/constants/assumptions";
+
+/**
+ * One shared "grid demand pressure" color ramp, keyed to POPULATION_DENSITY_TIERS,
+ * used by BOTH the population-density choropleth and the transmission-line halo
+ * below. Same color at the same density everywhere on the map is what makes the
+ * connection between the two datasets legible: a reddish county and a reddish
+ * line running through it are visually the same claim.
+ */
+const DEMAND_PRESSURE_LOW_COLOR = "#f2b93b";
+const DEMAND_PRESSURE_MODERATE_COLOR = "#f2703b";
+const DEMAND_PRESSURE_HIGH_COLOR = "#ff5470";
 
 /** Builds the MapLibre layer spec(s) for a given layer definition + its GeoJSON source id. */
 export function buildLayerSpecs(
@@ -33,7 +45,40 @@ export function buildLayerSpecs(
       500,
       3.2,
     ];
+    // Soft blurred glow behind the voltage-colored line, present only where the
+    // line runs through a county with meaningful population density (below the
+    // "low" tier it's fully transparent, so most rural transmission draws with
+    // no glow at all — this is additive context on the existing line, not a
+    // second competing layer, which is what keeps it from being distracting.
+    const pressureHaloColor: DataDrivenPropertyValueSpecification<string> = [
+      "step",
+      ["coalesce", ["get", "PopulationDensityPerSqMi"], -1],
+      "transparent",
+      POPULATION_DENSITY_TIERS.low, DEMAND_PRESSURE_LOW_COLOR,
+      POPULATION_DENSITY_TIERS.moderate, DEMAND_PRESSURE_MODERATE_COLOR,
+      POPULATION_DENSITY_TIERS.high, DEMAND_PRESSURE_HIGH_COLOR,
+    ];
+    const pressureHaloOpacity: DataDrivenPropertyValueSpecification<number> = [
+      "step",
+      ["coalesce", ["get", "PopulationDensityPerSqMi"], -1],
+      0,
+      POPULATION_DENSITY_TIERS.low, 0.22,
+      POPULATION_DENSITY_TIERS.moderate, 0.32,
+      POPULATION_DENSITY_TIERS.high, 0.45,
+    ];
     return [
+      {
+        id: `${mapLayerId}-pressure-halo`,
+        type: "line",
+        source: sourceId,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": pressureHaloColor,
+          "line-opacity": pressureHaloOpacity,
+          "line-width": ["+", voltageWidth, 5],
+          "line-blur": 3,
+        },
+      },
       {
         id: `${mapLayerId}-line`,
         type: "line",
@@ -48,30 +93,39 @@ export function buildLayerSpecs(
   }
 
   if (layer.id === "population-density") {
-    // Sequential choropleth by county population density (people/sq mi). Bucketed
-    // to match POPULATION_DENSITY_TIERS in src/lib/constants/assumptions.ts, so
-    // the map legend and the analysis engine's "grid demand pressure" tiers agree.
+    // Same demand-pressure ramp as the transmission-line halo above, but kept
+    // deliberately quiet: no fill at all below the "low" tier (most of a state's
+    // land area), and even at the highest tier this tops out well under the
+    // opacity of a normal layer fill — a wash of context to read alongside the
+    // transmission lines, not a bold layer competing with them.
     const densityColor: DataDrivenPropertyValueSpecification<string> = [
       "step",
       ["coalesce", ["get", "PopulationDensityPerSqMi"], -1],
-      "#3a4658", // no data
-      0, "#d8e6f2",
-      25, "#9dc3e6",
-      150, "#4f81bd",
-      1000, "#1f3864",
+      "transparent",
+      POPULATION_DENSITY_TIERS.low, DEMAND_PRESSURE_LOW_COLOR,
+      POPULATION_DENSITY_TIERS.moderate, DEMAND_PRESSURE_MODERATE_COLOR,
+      POPULATION_DENSITY_TIERS.high, DEMAND_PRESSURE_HIGH_COLOR,
+    ];
+    const densityOpacity: DataDrivenPropertyValueSpecification<number> = [
+      "step",
+      ["coalesce", ["get", "PopulationDensityPerSqMi"], -1],
+      0,
+      POPULATION_DENSITY_TIERS.low, 0.08,
+      POPULATION_DENSITY_TIERS.moderate, 0.14,
+      POPULATION_DENSITY_TIERS.high, 0.2,
     ];
     return [
       {
         id: `${mapLayerId}-fill`,
         type: "fill",
         source: sourceId,
-        paint: { "fill-color": densityColor, "fill-opacity": 0.55 },
+        paint: { "fill-color": densityColor, "fill-opacity": densityOpacity },
       },
       {
         id: `${mapLayerId}-outline`,
         type: "line",
         source: sourceId,
-        paint: { "line-color": "#0a0d12", "line-width": 0.4, "line-opacity": 0.4 },
+        paint: { "line-color": densityColor, "line-width": 0.5, "line-opacity": 0.25 },
       },
     ];
   }
