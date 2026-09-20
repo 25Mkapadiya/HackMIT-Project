@@ -204,14 +204,14 @@ export async function computeWaterAnalysis(scenario: ScenarioConfig): Promise<Wa
             ],
     },
     estimatedWithdrawalGalPerDay: {
-      label: isEvaporative ? "Estimated operating water use" : "Annualized cooling-water supply",
-      value: Math.round(withdrawalGalPerDay),
+      label: isEvaporative ? "Cooling-water withdrawal / makeup" : "Annualized cooling-water supply",
+      value: isEvaporative ? null : Math.round(withdrawalGalPerDay),
       unit: "gal/day",
       confidence: "estimated",
       source: waterModelSource,
       caveats: isEvaporative
         ? [
-            `This duplicates the empirical operating WUE-based water-use estimate rather than presenting a false-precision withdrawal number. DOE peak-design context: ~${Math.round(evaporativePeakMakeupGalPerDay).toLocaleString()} gal/day makeup and ~${Math.round(evaporativePeakBlowdownGalPerDay).toLocaleString()} gal/day blowdown at full cooling-tower load.`,
+            `Not shown as a single precise number because operator WUE reports water use, while site withdrawal/makeup accounting varies by system boundary and return flows. DOE peak-design context: ~${Math.round(evaporativePeakMakeupGalPerDay).toLocaleString()} gal/day makeup and ~${Math.round(evaporativePeakBlowdownGalPerDay).toLocaleString()} gal/day blowdown at full cooling-tower load.`,
           ]
         : isClosedChilledWater
           ? ["Annualized average; actual closed-loop makeup/refill occurs during maintenance or small loss events, not as a steady withdrawal."]
